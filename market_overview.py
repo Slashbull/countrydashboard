@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 
-def market_overview(data: pd.DataFrame):
+def market_overview_dashboard(data: pd.DataFrame):
     st.title("📊 Market Overview Dashboard")
     
     # Verify required columns
