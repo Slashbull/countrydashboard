@@ -1,76 +1,22 @@
 TradeDataDashboard/
 │
-├── core_system.py             
-│   # Main entry-point for the Streamlit app.
-│   # Initializes configuration, performs user authentication, loads data,
-│   # and routes between independent dashboard modules.
-│
-├── authentication.py          
-│   # Handles user login using streamlit-authenticator.
-│
-├── market_overview.py         
-│   # Dashboard module for the Market Overview.
-│   # Displays KPIs, time series trends, partner rankings, etc.
-│
-├── detailed_analysis.py       
-│   # Dashboard module for Detailed Analysis.
-│   # Provides drill-down views and interactive tables for in-depth data exploration.
-│
-├── ai_based_alerts.py         
-│   # Dashboard module for AI-Based Alerts.
-│   # Implements anomaly detection and predictive algorithms to flag unusual trends.
-│
-├── forecasting.py             
-│   # Dashboard module for Forecasting.
-│   # Contains predictive models and visualizations for future market trends.
-│
-├── country_level_insights.py  
-│   # Dashboard module for Country-Level Insights.
-│   # Provides insights and comparisons by partner country.
-│
-├── segmentation_analysis.py   
-│   # Module for Segmentation Analysis.
-│   # Uses clustering techniques (e.g., K-Means) to uncover natural groupings in the data.
-│
-├── correlation_analysis.py    
-│   # Module for Correlation Analysis.
-│   # Computes correlation matrices, generates heatmaps, and performs statistical tests.
-│
+├── config.py
+├── authentication.py
+├── data_loader.py
+├── filters.py
+├── calculations.py
+├── core_system.py
+├── market_overview.py
+├── detailed_analysis.py
+├── ai_based_alerts.py
+├── forecasting.py
+├── country_level_insights.py
+├── segmentation_analysis.py
+├── correlation_analysis.py
 ├── time_series_decomposition.py
-│   # Module for Time Series Decomposition.
-│   # Decomposes the time series into trend, seasonality, and residual components.
-│
-├── calendar_insights.py       
-│   # Module for Calendar/Business Cycle Insights.
-│   # Analyzes data based on business cycles, calendar effects, and seasonal events.
-│
-├── climate_insights.py        
-│   # Module for Climate Data Analysis.
-│   # Uses the Open-Meteo API to fetch climate/weather data and correlate it with business trends.
-│
-├── filters.py                 
-│   # Contains reusable filter components and functions.
-│   # Implements smart filtering by Month, Year, Reporter, Partner, Code, etc.
-│
-├── data_loader.py             
-│   # Centralized module for data ingestion, cleaning, and transformation.
-│   # Supports user-uploaded CSV files or Google Spreadsheet links.
-│
-├── calculations.py            
-│   # Module for computing custom metrics and KPIs.
-│   # Contains functions for aggregations, growth rates, moving averages, etc.
-│
-├── reporting.py               
-│   # Module for automated report generation.
-│   # Exports dashboards or analysis reports in PDF, Excel, or HTML formats.
-│
-├── config.py                  
-│   # Contains configuration settings, constants, file paths, and default parameters.
-│   # Also holds authentication credentials.
-│
-├── requirements.txt           
-│   # Lists all required Python packages.
-│
-└── structure.txt              
-    # This file.
-    # Documents the project’s directory and file structure.
+├── calendar_insights.py
+├── climate_insights.py
+├── scenario_simulation.py      # (Optional)
+├── reporting.py                # (Optional)
+├── requirements.txt
+└── structure.txt
