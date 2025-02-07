@@ -1,6 +1,5 @@
 # core_system.py
 import streamlit as st
-import logging
 import config
 from authentication import login
 from data_loader import upload_data
@@ -17,7 +16,7 @@ from time_series_decomposition import show_time_series_decomposition
 from calendar_insights import show_calendar_insights
 from climate_insights import show_climate_insights
 
-# Optional modules for additional features
+# Optional modules for extended functionality
 try:
     from scenario_simulation import simulate_scenario
 except ImportError:
@@ -28,23 +27,20 @@ try:
 except ImportError:
     generate_report = None
 
-# Set up basic logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
 # Set page configuration
 st.set_page_config(page_title=config.APP_TITLE, layout="wide")
 st.title(config.APP_TITLE)
 
-# ------------------------
+# -------------------------------
 # 1. Authentication
-# ------------------------
+# -------------------------------
 if not login():
-    st.stop()
+    st.stop()  # Stop execution if login fails
 
-# ------------------------
-# 2. Data Upload and Storage in Session State
-# ------------------------
+# -------------------------------
+# 2. Data Upload & Session State
+# -------------------------------
+# Check if data is already in session; if not, prompt for upload
 if "uploaded_data" not in st.session_state or st.sidebar.button("Reset Data"):
     df = upload_data()
     st.session_state["uploaded_data"] = df
@@ -55,9 +51,9 @@ if df.empty:
     st.warning("No data loaded. Please upload a CSV file or provide a Google Spreadsheet link.")
     st.stop()
 
-# ------------------------
+# -------------------------------
 # 3. Dashboard Navigation
-# ------------------------
+# -------------------------------
 dashboard_options = [
     "Market Overview",
     "Detailed Analysis",
@@ -71,7 +67,7 @@ dashboard_options = [
     "Climate Insights"
 ]
 
-# Optionally include Scenario Simulation and Reporting if available.
+# Append optional features if available
 if simulate_scenario is not None:
     dashboard_options.append("Scenario Simulation")
 if generate_report is not None:
@@ -79,9 +75,9 @@ if generate_report is not None:
 
 selection = st.sidebar.radio("Select Dashboard", dashboard_options)
 
-# ------------------------
-# 4. Route to the Selected Dashboard
-# ------------------------
+# -------------------------------
+# 4. Routing to Selected Dashboard
+# -------------------------------
 if selection == "Market Overview":
     show_market_overview()
 elif selection == "Detailed Analysis":
@@ -103,6 +99,6 @@ elif selection == "Calendar Insights":
 elif selection == "Climate Insights":
     show_climate_insights()
 elif selection == "Scenario Simulation" and simulate_scenario is not None:
-    simulate_scenario(df)  # Pass the loaded data
+    simulate_scenario(df)  # Pass the uploaded data to the simulation module
 elif selection == "Reporting" and generate_report is not None:
-    generate_report(df)  # Pass the loaded data
+    generate_report(df)  # Allow the user to download/export the current data
