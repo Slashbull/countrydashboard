@@ -1,59 +1,66 @@
 # core_system.py
+
 import streamlit as st
 import pandas as pd
 import altair as alt
 import requests
 from io import StringIO
-import seaborn as sns
-import matplotlib.pyplot as plt
-from statsmodels.tsa.seasonal import seasonal_decompose
-from sklearn.cluster import KMeans
 import config
 
-# -------------------------
-# CONFIGURATION & UI SETUP
-# -------------------------
-APP_TITLE = config.APP_TITLE
-CREDENTIALS = config.SINGLE_USER
-DEFAULT_SHEET_NAME = config.DEFAULT_SHEET_NAME
-OPEN_METEO_API_URL = config.OPEN_METEO_API_URL
-
-st.set_page_config(page_title=APP_TITLE, layout="wide")
+# ------------------------------------------------------
+# CONFIGURATION & PAGE SETUP
+# ------------------------------------------------------
+st.set_page_config(page_title=config.APP_TITLE, layout="wide")
+# Custom CSS for a clean, modern look:
 st.markdown(
     """
     <style>
-    .main {font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;}
-    .sidebar .sidebar-content {background-color: #f5f5f5; padding: 10px;}
+      .main { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .sidebar .sidebar-content { background-color: #f5f5f5; padding: 10px; }
     </style>
     """,
     unsafe_allow_html=True
 )
-st.title(APP_TITLE)
 
-# -------------------------
-# INLINE AUTHENTICATION
-# -------------------------
-def authenticate():
-    if "logged_in" not in st.session_state:
-        st.session_state.logged_in = False
+# Set the title (main header)
+st.title(config.APP_TITLE)
+
+# ------------------------------------------------------
+# INLINE AUTHENTICATION (in sidebar)
+# ------------------------------------------------------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+with st.sidebar:
+    st.markdown("## Login")
     if not st.session_state.logged_in:
-        st.markdown("<h2 style='text-align: center;'>Login</h2>", unsafe_allow_html=True)
         username = st.text_input("Username", key="username")
         password = st.text_input("Password", type="password", key="password")
         if st.button("Login"):
-            if username == CREDENTIALS["username"] and password == CREDENTIALS["password"]:
-                st.success(f"Welcome, {CREDENTIALS['name']}!")
+            if username == config.SINGLE_USER["username"] and password == config.SINGLE_USER["password"]:
+                st.success(f"Welcome, {config.SINGLE_USER['name']}!")
                 st.session_state.logged_in = True
             else:
                 st.error("🚨 Incorrect username or password.")
-    return st.session_state.logged_in
+    else:
+        st.success(f"Logged in as {config.SINGLE_USER['name']}")
 
-if not authenticate():
+# If not logged in, stop the app.
+if not st.session_state.logged_in:
     st.stop()
 
-# -------------------------
-# INLINE DATA UPLOAD
-# -------------------------
+# ------------------------------------------------------
+# SIDEBAR: RESET DATA BUTTON
+# ------------------------------------------------------
+with st.sidebar:
+    if st.button("Reset Data"):
+        if "data" in st.session_state:
+            del st.session_state["data"]
+        st.info("Data has been reset. Please upload new data.")
+
+# ------------------------------------------------------
+# INLINE DATA UPLOAD & PREPROCESSING
+# ------------------------------------------------------
 def load_csv_data(uploaded_file) -> pd.DataFrame:
     try:
         df = pd.read_csv(uploaded_file, low_memory=False)
@@ -64,7 +71,7 @@ def load_csv_data(uploaded_file) -> pd.DataFrame:
 
 def upload_data() -> pd.DataFrame:
     st.markdown("<h2 style='text-align: center;'>📂 Upload or Link Data</h2>", unsafe_allow_html=True)
-    source = st.radio("Choose Data Source:", ("Upload CSV", "Google Sheet Link"), index=0)
+    source = st.radio("Choose Data Source:", ("Upload CSV", "Google Sheet Link"), key="data_source")
     df = None
     if source == "Upload CSV":
         file = st.file_uploader("Upload CSV", type=["csv"], help="Upload your CSV file with trade data.")
@@ -74,14 +81,16 @@ def upload_data() -> pd.DataFrame:
         sheet_url = st.text_input("Enter Google Sheet Link:")
         if sheet_url and st.button("Load Google Sheet"):
             try:
+                # Extract the sheet ID from the URL.
                 sheet_id = sheet_url.split("/d/")[1].split("/")[0]
-                csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={DEFAULT_SHEET_NAME}"
+                csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={config.DEFAULT_SHEET_NAME}"
                 response = requests.get(csv_url)
                 response.raise_for_status()
                 df = pd.read_csv(StringIO(response.text), low_memory=False)
             except Exception as e:
                 st.error(f"🚨 Error loading Google Sheet: {e}")
     if df is not None and not df.empty:
+        # Create a 'Date' column from Year and Month (if available)
         if "Year" in df.columns and "Month" in df.columns:
             df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
             df["Month"] = pd.to_numeric(df["Month"], errors="coerce")
@@ -91,22 +100,26 @@ def upload_data() -> pd.DataFrame:
         st.warning("No data loaded. Please upload a CSV file or provide a valid Google Sheet link.")
         return pd.DataFrame()
 
-if "data" not in st.session_state or st.sidebar.button("Reset Data"):
-    data = upload_data()
-    st.session_state["data"] = data
+# Load data and store in session_state
+if "data" not in st.session_state:
+    df = upload_data()
+    st.session_state["data"] = df
 else:
-    data = st.session_state["data"]
+    df = st.session_state["data"]
 
-if data.empty:
+if df.empty:
     st.warning("No data available.")
     st.stop()
 else:
-    st.write("Data loaded successfully! Preview:")
-    st.dataframe(data.head())
+    st.success("Data loaded successfully!")
+    st.dataframe(df.head())
 
-# -------------------------
-# IMPORT DASHBOARD MODULES
-# -------------------------
+# Make the global variable available to dashboard modules.
+data = st.session_state["data"]
+
+# ------------------------------------------------------
+# IMPORT DASHBOARD MODULES (Separate Files)
+# ------------------------------------------------------
 from filters import add_filters
 from market_overview import show_market_overview
 from detailed_analysis import show_detailed_analysis
@@ -121,10 +134,10 @@ from climate_insights import show_climate_insights
 from scenario_simulation import simulate_scenario   # Optional
 from reporting import generate_report                # Optional
 
-# -------------------------
-# MAIN NAVIGATION
-# -------------------------
-dashboards = [
+# ------------------------------------------------------
+# MAIN NAVIGATION (Sidebar)
+# ------------------------------------------------------
+dashboard_options = [
     "Market Overview",
     "Detailed Analysis",
     "AI-Based Alerts",
@@ -138,8 +151,11 @@ dashboards = [
     "Scenario Simulation",
     "Reporting"
 ]
-choice = st.sidebar.radio("Select Dashboard", dashboards)
+choice = st.sidebar.radio("Select Dashboard", dashboard_options)
 
+# ------------------------------------------------------
+# DASHBOARD ROUTING
+# ------------------------------------------------------
 if choice == "Market Overview":
     show_market_overview()
 elif choice == "Detailed Analysis":
