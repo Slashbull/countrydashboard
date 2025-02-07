@@ -4,6 +4,7 @@ import pandas as pd
 
 def add_filters(df: pd.DataFrame) -> pd.DataFrame:
     st.sidebar.header("Filter Data")
+    
     years = sorted(df['Year'].dropna().unique().tolist())
     selected_years = st.sidebar.multiselect("Select Year(s)", options=years, default=years)
     
