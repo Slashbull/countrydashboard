@@ -3,7 +3,6 @@ import pandas as pd
 
 def calculate_kpis(df: pd.DataFrame) -> dict:
     total_tons = df["Tons"].sum() if "Tons" in df.columns else 0
-    # Group by Year-Month for average monthly calculation
     if "Date" in df.columns:
         monthly = df.groupby(pd.Grouper(key="Date", freq="M"))["Tons"].sum()
         avg_monthly = monthly.mean()
