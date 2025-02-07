@@ -1,7 +1,10 @@
 # reporting.py
 import streamlit as st
+import pandas as pd
 
-def generate_report():
-    from core_system import data  # Global data
+def reporting_dashboard(data: pd.DataFrame):
+    st.header("📑 Reporting & Exports")
+    st.markdown("Preview the top rows and download the data as CSV.")
+    st.dataframe(data.head(50))
     csv = data.to_csv(index=False).encode('utf-8')
-    st.download_button("Download Report as CSV", data=csv, file_name="trade_report.csv", mime="text/csv")
+    st.download_button("Download Data as CSV", csv, "trade_report.csv", "text/csv")
