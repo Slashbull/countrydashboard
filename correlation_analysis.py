@@ -1,17 +1,15 @@
 # correlation_analysis.py
 import streamlit as st
-import seaborn as sns
-import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.express as px
 
-def show_correlation_analysis():
-    st.header("Correlation Analysis")
-    from core_system import data  # Global data
-    from filters import add_filters
-    df_filtered = add_filters(data)
-    corr_matrix = df_filtered.select_dtypes(include=['float64', 'int64']).corr()
-    st.write("Correlation Matrix:")
+def correlation_analysis_dashboard(data: pd.DataFrame):
+    st.header("🔗 Correlation Analysis")
+    numeric_cols = data.select_dtypes(include=["number"]).columns.tolist()
+    if not numeric_cols:
+        st.error("No numeric columns found for correlation analysis.")
+        return
+    corr_matrix = data[numeric_cols].corr()
     st.dataframe(corr_matrix)
-    
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
-    st.pyplot(fig)
+    fig = px.imshow(corr_matrix, text_auto=True, title="Correlation Matrix")
+    st.plotly_chart(fig, use_container_width=True)
