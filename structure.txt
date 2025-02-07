@@ -1,11 +1,7 @@
 TradeDataDashboard/
-│
 ├── config.py
-├── authentication.py
-├── data_loader.py
-├── filters.py
-├── calculations.py
 ├── core_system.py
+├── filters.py
 ├── market_overview.py
 ├── detailed_analysis.py
 ├── ai_based_alerts.py
@@ -16,7 +12,6 @@ TradeDataDashboard/
 ├── time_series_decomposition.py
 ├── calendar_insights.py
 ├── climate_insights.py
-├── scenario_simulation.py      # (Optional)
-├── reporting.py                # (Optional)
-├── requirements.txt
-└── structure.txt
+├── scenario_simulation.py    # Optional
+├── reporting.py              # Optional
+└── requirements.txt
