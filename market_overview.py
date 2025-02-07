@@ -14,10 +14,10 @@ def market_overview_dashboard(data: pd.DataFrame):
         st.error(f"🚨 Missing columns: {', '.join(missing)}")
         return
 
-    # Convert Tons column to numeric.
+    # Convert the 'Tons' column to numeric.
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
     
-    # Use filtered data if available (set in st.session_state by your filters module), otherwise use raw data.
+    # Use filtered data if available, otherwise use the raw data.
     df = st.session_state.get("filtered_data", data).copy()
     
     # --- Create the 'Period' column if not already present ---
@@ -26,7 +26,7 @@ def market_overview_dashboard(data: pd.DataFrame):
             def parse_period(row):
                 month_val = row["Month"]
                 year_val = str(row["Year"])
-                # If Month is numeric (e.g. 1), parse as month number; otherwise, assume abbreviated text.
+                # If the month is numeric, parse as month number; else assume abbreviated text.
                 if str(month_val).isdigit():
                     return datetime.strptime(f"{int(month_val)} {year_val}", "%m %Y")
                 else:
@@ -44,7 +44,9 @@ def market_overview_dashboard(data: pd.DataFrame):
     # --- Dashboard Layout with Tabs ---
     tabs = st.tabs(["Summary", "Trends", "Breakdown", "Detailed Analysis"])
 
-    ### Tab 1: Summary
+    #######################
+    # Tab 1: Summary
+    #######################
     with tabs[0]:
         st.header("Key Performance Indicators")
         total_volume = df["Tons"].sum()
@@ -52,7 +54,7 @@ def market_overview_dashboard(data: pd.DataFrame):
         unique_reporters = df["Reporter"].nunique()
         avg_volume = total_volume / unique_partners if unique_partners > 0 else 0
 
-        # Calculate Month-over-Month (MoM) growth
+        # Calculate Month-over-Month (MoM) Growth
         periods_sorted = df.sort_values("Period_dt")["Period"].unique() if "Period_dt" in df.columns else df["Period"].unique()
         if len(periods_sorted) >= 2:
             last_period = periods_sorted[-1]
@@ -85,78 +87,75 @@ def market_overview_dashboard(data: pd.DataFrame):
         )
         st.plotly_chart(fig_donut, use_container_width=True)
 
-    ### Tab 2: Trends
+    #######################
+    # Tab 2: Trends
+    #######################
     with tabs[1]:
         st.header("Monthly & Yearly Trends")
+        
         # --- Overall Monthly Trend ---
-        monthly_trends = df.groupby(["Period", "Period_dt"], as_index=False)["Tons"].sum().sort_values("Period_dt")
-        fig_overall = px.line(
-            monthly_trends,
-            x="Period",
+        st.subheader("Overall Monthly Trends")
+        monthly_trends = df.groupby("Period")["Tons"].sum().reset_index()
+        monthly_trends["Period_str"] = monthly_trends["Period"].astype(str)
+        fig_line = px.line(
+            monthly_trends, 
+            x="Period_str", 
             y="Tons",
-            title="Overall Monthly Trade Volume Trend",
+            title="Monthly Import Trends", 
             markers=True
         )
-        fig_overall.update_layout(
-            xaxis=dict(title="Period", tickangle=-45),
-            yaxis=dict(title="Volume (Tons)"),
-            margin=dict(l=40, r=40, t=40, b=80),
-            template="plotly_white"
-        )
-        st.plotly_chart(fig_overall, use_container_width=True)
+        st.plotly_chart(fig_line, use_container_width=True)
         
-        st.markdown("---")
-        
-        # --- Monthly Trend by Year ---
-        if "Year" in df.columns and "Month" in df.columns:
-            # Convert Month to abbreviated string if necessary.
-            df["Month_str"] = df["Month"].apply(
-                lambda x: datetime.strptime(str(x), "%m").strftime("%b") if str(x).isdigit() else x
-            )
-            month_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-            df["Month_str"] = pd.Categorical(df["Month_str"], categories=month_order, ordered=True)
-            monthly_by_year = df.groupby(["Year", "Month_str"], as_index=False)["Tons"].sum().sort_values(["Year", "Month_str"])
-            fig_by_year = px.line(
-                monthly_by_year,
-                x="Month_str",
+        # --- Monthly Trends by Year ---
+        if df["Year"].nunique() > 1:
+            st.markdown("#### Trends by Year")
+            # Group by Year and Month
+            yearly_trends = df.groupby(["Year", "Month"])["Tons"].sum().reset_index()
+            # For display purposes, convert numeric months to abbreviated month names if needed.
+            def convert_month(m):
+                try:
+                    m_int = int(m)
+                    return datetime.strptime(str(m_int), "%m").strftime("%b")
+                except:
+                    return m
+            yearly_trends["Month"] = yearly_trends["Month"].apply(convert_month)
+            # Define month order mapping
+            month_order = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+                           "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+            yearly_trends["Month_Order"] = yearly_trends["Month"].map(month_order)
+            yearly_trends = yearly_trends.sort_values("Month_Order")
+            fig_yearly = px.line(
+                yearly_trends,
+                x="Month",
                 y="Tons",
                 color="Year",
-                title="Monthly Trend by Year",
+                title="Monthly Trends by Year",
                 markers=True
             )
-            fig_by_year.update_layout(
-                xaxis=dict(title="Month"),
-                yaxis=dict(title="Volume (Tons)"),
-                margin=dict(l=40, r=40, t=40, b=40),
-                template="plotly_white"
-            )
-            st.plotly_chart(fig_by_year, use_container_width=True)
+            st.plotly_chart(fig_yearly, use_container_width=True)
         else:
-            st.info("Year and/or Month information not available for monthly trend by year.")
-        
+            st.info("Not enough year information for Trends by Year.")
+
         st.markdown("---")
         
-        # --- Yearly Trend (Optional) ---
+        # --- Yearly Trend ---
         if "Year" in df.columns:
-            yearly_trends = df.groupby("Year", as_index=False)["Tons"].sum().sort_values("Year")
+            st.subheader("Yearly Trade Volume")
+            yearly_total = df.groupby("Year", as_index=False)["Tons"].sum().sort_values("Year")
             fig_year = px.bar(
-                yearly_trends,
+                yearly_total,
                 x="Year",
                 y="Tons",
                 title="Yearly Trade Volume",
                 text_auto=True
             )
-            fig_year.update_layout(
-                xaxis_title="Year",
-                yaxis_title="Volume (Tons)",
-                margin=dict(l=40, r=40, t=40, b=40),
-                template="plotly_white"
-            )
             st.plotly_chart(fig_year, use_container_width=True)
         else:
             st.info("Year information not available.")
 
-    ### Tab 3: Breakdown
+    #######################
+    # Tab 3: Breakdown
+    #######################
     with tabs[2]:
         st.header("Breakdown Analysis")
         st.subheader("Top 5 Partners")
@@ -185,7 +184,9 @@ def market_overview_dashboard(data: pd.DataFrame):
         else:
             st.info("Flow information not available.")
 
-    ### Tab 4: Detailed Analysis
+    #######################
+    # Tab 4: Detailed Analysis
+    #######################
     with tabs[3]:
         st.header("Detailed Analysis")
         st.markdown("Drill down into the data for granular insights.")
