@@ -1,13 +1,12 @@
 # scenario_simulation.py
 import streamlit as st
 import pandas as pd
+import numpy as np
 
-def simulate_scenario():
-    st.header("Scenario Simulation")
-    growth_factor = st.slider("Select Growth Factor", 0.5, 2.0, 1.0, 0.1)
-    from core_system import data  # Global data
-    df_sim = data.copy()
-    if "Tons" in df_sim.columns:
-        df_sim["Simulated_Tons"] = df_sim["Tons"] * growth_factor
-        st.write("Simulated Data (first 10 rows):")
-        st.dataframe(df_sim.head(10))
+def scenario_simulation_dashboard(data: pd.DataFrame):
+    st.header("🔄 Scenario Simulation")
+    st.markdown("Adjust parameters to simulate different trade scenarios.")
+    growth_rate = st.slider("Expected Growth Rate (%)", -10, 50, 5)
+    base_volume = data["Tons"].sum()
+    simulated_volume = base_volume * (1 + growth_rate/100)
+    st.metric("Simulated Future Volume", f"{simulated_volume:,.2f}")
