@@ -1,23 +1,17 @@
 # calendar_insights.py
 import streamlit as st
-import pandas as pd
 import altair as alt
-from data_loader import load_data
-from filters import add_filters
 
 def show_calendar_insights():
     st.header("Calendar/Business Cycle Insights")
-    df = load_data()
-    df = add_filters(df)
-    # Create a simple pivot table: Average tonnage per Month for each Year
-    pivot = df.pivot_table(index="Month", columns="Year", values="Tons", aggfunc="mean")
-    st.write("Average Monthly Tonnage by Year")
+    from core_system import data  # Global data
+    from filters import add_filters
+    df_filtered = add_filters(data)
+    pivot = df_filtered.pivot_table(index="Month", columns="Year", values="Tons", aggfunc="mean")
+    st.write("Average Monthly Tonnage by Year:")
     st.dataframe(pivot)
-    
-    # Create a heatmap-like chart using Altair
-    df_heat = df.copy()
-    df_heat['Month_Str'] = df_heat['Month'].astype(str)
-    heat = alt.Chart(df_heat).mark_rect().encode(
+    df_filtered['Month_Str'] = df_filtered['Month'].astype(str)
+    heat = alt.Chart(df_filtered).mark_rect().encode(
         x=alt.X("Year:N", title="Year"),
         y=alt.Y("Month_Str:N", title="Month"),
         color=alt.Color("mean(Tons):Q", title="Avg Tonnage"),
