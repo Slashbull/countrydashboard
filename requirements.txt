@@ -1,8 +1,10 @@
 streamlit
 pandas
-altair
 plotly
-scikit-learn
-statsmodels
-seaborn
+numpy
 requests
+python-dotenv
+scipy
+statsmodels
+scikit-learn
+rapidfuzz
