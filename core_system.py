@@ -6,23 +6,25 @@ from io import StringIO
 import logging
 from datetime import datetime
 
+# Import configuration and filters
 import config
 from filters import apply_filters
 
-# Import dashboard modules
+# Import dashboard modules (for now, we show Market Overview and Detailed Analysis as examples)
 from market_overview import market_overview_dashboard
-from detailed_analysis import detailed_analysis_dashboard
-from ai_based_alerts import ai_based_alerts_dashboard
-from forecasting import forecasting_dashboard
-from country_level_insights import country_level_insights_dashboard
-from segmentation_analysis import segmentation_analysis_dashboard
-from correlation_analysis import correlation_analysis_dashboard
-from time_series_decomposition import time_series_decomposition_dashboard
-from calendar_insights import calendar_insights_dashboard
-from climate_insights import climate_insights_dashboard
-from scenario_simulation import scenario_simulation_dashboard
-from reporting import reporting_dashboard
+from detailed_analysis import detailed_analysis_dashboard  # assume this exists
+from ai_based_alerts import ai_based_alerts_dashboard        # assume this exists
+from forecasting import forecasting_dashboard                # assume this exists
+from country_level_insights import country_level_insights_dashboard  # assume this exists
+from segmentation_analysis import segmentation_analysis_dashboard     # assume this exists
+from correlation_analysis import correlation_analysis_dashboard         # assume this exists
+from time_series_decomposition import time_series_decomposition_dashboard   # assume this exists
+from calendar_insights import calendar_insights_dashboard                   # assume this exists
+from climate_insights import climate_insights_dashboard                     # assume this exists
+from scenario_simulation import scenario_simulation_dashboard               # assume this exists
+from reporting import reporting_dashboard                                   # assume this exists
 
+# Configure logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ def logout_button():
 
 @st.cache_data(show_spinner=False)
 def load_csv(file) -> pd.DataFrame:
-    """Load CSV data into a DataFrame."""
+    """Load CSV data into a DataFrame with caching."""
     try:
         df = pd.read_csv(file, low_memory=False)
     except Exception as e:
@@ -60,17 +62,25 @@ def load_csv(file) -> pd.DataFrame:
     return df
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert Tons to numeric and create a Period column from Month and Year."""
+    """
+    Convert the Tons column to numeric and create a 'Period' column from Month and Year.
+    If Month is numeric, it is parsed as a month number; otherwise, as an abbreviated month.
+    """
     if "Tons" in df.columns:
-        df["Tons"] = pd.to_numeric(df["Tons"].astype(str).str.replace(",", "", regex=False), errors="coerce")
+        df["Tons"] = pd.to_numeric(
+            df["Tons"].astype(str).str.replace(",", "", regex=False),
+            errors="coerce"
+        )
     if "Year" in df.columns and "Month" in df.columns:
         try:
-            # If Month is numeric use %m; otherwise assume abbreviated month name (%b)
-            df["Period_dt"] = df.apply(
-                lambda row: datetime.strptime(f"{row['Month']} {int(row['Year'])}", "%m %Y")
-                if str(row["Month"]).isdigit() else datetime.strptime(f"{row['Month']} {row['Year']}", "%b %Y"),
-                axis=1
-            )
+            def parse_period(row):
+                m = row["Month"]
+                y = str(row["Year"])
+                if str(m).isdigit():
+                    return datetime.strptime(f"{int(m)} {y}", "%m %Y")
+                else:
+                    return datetime.strptime(f"{m} {y}", "%b %Y")
+            df["Period_dt"] = df.apply(parse_period, axis=1)
             sorted_periods = sorted(df["Period_dt"].dropna().unique())
             period_labels = [dt.strftime("%b-%Y") for dt in sorted_periods]
             df["Period"] = df["Period_dt"].dt.strftime("%b-%Y")
@@ -108,7 +118,7 @@ def upload_data():
     if df is not None and not df.empty:
         df = preprocess_data(df)
         st.session_state["data"] = df
-        # Apply global filters (the filtered data is used in dashboards)
+        # Apply global filters from filters.py
         filtered_df, _ = apply_filters(df)
         st.session_state["filtered_data"] = filtered_df
         st.success("✅ Data loaded and preprocessed successfully!")
@@ -168,7 +178,7 @@ def main():
         st.header("Executive Summary & Data Upload")
         df = upload_data()
         if df is not None and not df.empty:
-            st.sidebar.download_button("Download Processed Data", df.to_csv(index=False).encode("utf-8"), "processed_data.csv", "text/csv")
+            st.sidebar.download_button("📥 Download Processed Data", df.to_csv(index=False).encode("utf-8"), "processed_data.csv", "text/csv")
     else:
         df = get_current_data()
         if df is None or df.empty:
