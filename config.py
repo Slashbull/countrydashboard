@@ -1,12 +1,12 @@
 # config.py
-APP_TITLE = "Trade Data Dashboard"
+import os
+from dotenv import load_dotenv
 
-# Single-user credentials (for demonstration only; in production, use secure storage and hashed passwords)
-SINGLE_USER = {
-    "username": "admin",
-    "password": "admin_password",  # Plaintext for demo only!
-    "name": "Admin User"
-}
+load_dotenv()  # Load environment variables from a .env file if present
 
-DEFAULT_SHEET_NAME = "Sheet1"
-OPEN_METEO_API_URL = "https://api.open-meteo.com/v1/forecast"
+# Application credentials (for demo; secure these in production)
+USERNAME = os.getenv("APP_USERNAME", "admin")
+PASSWORD = os.getenv("APP_PASSWORD", "admin123")
+
+# Default Google Sheet settings (if used)
+DEFAULT_SHEET_NAME = os.getenv("DEFAULT_SHEET_NAME", "data")
