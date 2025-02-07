@@ -12,6 +12,6 @@ TradeDataDashboard/
 ├── time_series_decomposition.py
 ├── calendar_insights.py
 ├── climate_insights.py
-├── scenario_simulation.py    # Optional
-├── reporting.py              # Optional
+├── scenario_simulation.py      # Optional module for “what if” simulations
+├── reporting.py                # Optional module for exports/reports
 └── requirements.txt
