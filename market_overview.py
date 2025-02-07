@@ -17,36 +17,33 @@ def market_overview_dashboard(data: pd.DataFrame):
     # Convert the 'Tons' column to numeric.
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
     
-    # Use filtered data if available, otherwise use the raw data.
-    df = st.session_state.get("filtered_data", data).copy()
+    # Work on a copy of the data.
+    df = data.copy()
     
-    # --- Create the 'Period' column if not already present ---
+    # --- Create the 'Period' column if not present ---
     if "Period" not in df.columns:
         try:
             def parse_period(row):
-                month_val = row["Month"]
-                year_val = str(row["Year"])
-                # If the month is numeric, parse as month number; else assume abbreviated text.
-                if str(month_val).isdigit():
-                    return datetime.strptime(f"{int(month_val)} {year_val}", "%m %Y")
+                m = row["Month"]
+                y = str(row["Year"])
+                if str(m).isdigit():
+                    return datetime.strptime(f"{int(m)} {y}", "%m %Y")
                 else:
-                    return datetime.strptime(f"{month_val} {year_val}", "%b %Y")
+                    return datetime.strptime(f"{m} {y}", "%b %Y")
             df["Period_dt"] = df.apply(parse_period, axis=1)
             sorted_periods = sorted(df["Period_dt"].dropna().unique())
             period_labels = [dt.strftime("%b-%Y") for dt in sorted_periods]
             df["Period"] = df["Period_dt"].dt.strftime("%b-%Y")
             df["Period"] = pd.Categorical(df["Period"], categories=period_labels, ordered=True)
         except Exception as e:
-            st.error("Error creating 'Period' column. Please check the Month and Year formats.")
+            st.error("Error creating 'Period' column. Please check Month and Year formats.")
             st.error(e)
             return
 
     # --- Dashboard Layout with Tabs ---
     tabs = st.tabs(["Summary", "Trends", "Breakdown", "Detailed Analysis"])
 
-    #######################
-    # Tab 1: Summary
-    #######################
+    ### Tab 1: Summary
     with tabs[0]:
         st.header("Key Performance Indicators")
         total_volume = df["Tons"].sum()
@@ -55,7 +52,10 @@ def market_overview_dashboard(data: pd.DataFrame):
         avg_volume = total_volume / unique_partners if unique_partners > 0 else 0
 
         # Calculate Month-over-Month (MoM) Growth
-        periods_sorted = df.sort_values("Period_dt")["Period"].unique() if "Period_dt" in df.columns else df["Period"].unique()
+        if "Period_dt" in df.columns:
+            periods_sorted = df.sort_values("Period_dt")["Period"].unique()
+        else:
+            periods_sorted = df["Period"].unique()
         if len(periods_sorted) >= 2:
             last_period = periods_sorted[-1]
             second_last_period = periods_sorted[-2]
@@ -87,13 +87,9 @@ def market_overview_dashboard(data: pd.DataFrame):
         )
         st.plotly_chart(fig_donut, use_container_width=True)
 
-    #######################
-    # Tab 2: Trends
-    #######################
+    ### Tab 2: Trends
     with tabs[1]:
         st.header("Monthly & Yearly Trends")
-        
-        # --- Overall Monthly Trend ---
         st.subheader("Overall Monthly Trends")
         monthly_trends = df.groupby("Period")["Tons"].sum().reset_index()
         monthly_trends["Period_str"] = monthly_trends["Period"].astype(str)
@@ -104,14 +100,18 @@ def market_overview_dashboard(data: pd.DataFrame):
             title="Monthly Import Trends", 
             markers=True
         )
+        fig_line.update_layout(
+            xaxis_title="Period",
+            yaxis_title="Volume (Tons)",
+            margin=dict(l=40, r=40, t=40, b=40)
+        )
         st.plotly_chart(fig_line, use_container_width=True)
         
-        # --- Monthly Trends by Year ---
+        st.markdown("---")
         if df["Year"].nunique() > 1:
             st.markdown("#### Trends by Year")
-            # Group by Year and Month
             yearly_trends = df.groupby(["Year", "Month"])["Tons"].sum().reset_index()
-            # For display purposes, convert numeric months to abbreviated month names if needed.
+            # Convert numeric month to abbreviated text if needed.
             def convert_month(m):
                 try:
                     m_int = int(m)
@@ -119,7 +119,6 @@ def market_overview_dashboard(data: pd.DataFrame):
                 except:
                     return m
             yearly_trends["Month"] = yearly_trends["Month"].apply(convert_month)
-            # Define month order mapping
             month_order = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
                            "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
             yearly_trends["Month_Order"] = yearly_trends["Month"].map(month_order)
@@ -137,8 +136,6 @@ def market_overview_dashboard(data: pd.DataFrame):
             st.info("Not enough year information for Trends by Year.")
 
         st.markdown("---")
-        
-        # --- Yearly Trend ---
         if "Year" in df.columns:
             st.subheader("Yearly Trade Volume")
             yearly_total = df.groupby("Year", as_index=False)["Tons"].sum().sort_values("Year")
@@ -153,9 +150,7 @@ def market_overview_dashboard(data: pd.DataFrame):
         else:
             st.info("Year information not available.")
 
-    #######################
-    # Tab 3: Breakdown
-    #######################
+    ### Tab 3: Breakdown
     with tabs[2]:
         st.header("Breakdown Analysis")
         st.subheader("Top 5 Partners")
@@ -184,13 +179,10 @@ def market_overview_dashboard(data: pd.DataFrame):
         else:
             st.info("Flow information not available.")
 
-    #######################
-    # Tab 4: Detailed Analysis
-    #######################
+    ### Tab 4: Detailed Analysis
     with tabs[3]:
         st.header("Detailed Analysis")
         st.markdown("Drill down into the data for granular insights.")
-        # Let the user choose the dimension for detailed analysis.
         dimension = st.radio("Select Dimension for Detailed Analysis:", ("Partner", "Reporter"), index=0)
         entities = sorted(df[dimension].dropna().unique().tolist())
         selected_entity = st.selectbox(f"Select {dimension}:", entities)
