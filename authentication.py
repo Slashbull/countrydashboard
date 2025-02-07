@@ -5,8 +5,8 @@ from config import SINGLE_USER
 def login():
     """
     A simple single-user authentication.
-    Prompts for username and password and checks against SINGLE_USER.
-    Returns True if login is successful, else False.
+    Prompts for username and password and verifies against SINGLE_USER.
+    Returns True if authentication succeeds, else False.
     """
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
