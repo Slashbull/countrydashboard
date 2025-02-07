@@ -10,19 +10,19 @@ from datetime import datetime
 import config
 from filters import apply_filters
 
-# Import dashboard modules (for now, we show Market Overview and Detailed Analysis as examples)
+# Import dashboard modules (assumed to exist)
 from market_overview import market_overview_dashboard
-from detailed_analysis import detailed_analysis_dashboard  # assume this exists
-from ai_based_alerts import ai_based_alerts_dashboard        # assume this exists
-from forecasting import forecasting_dashboard                # assume this exists
-from country_level_insights import country_level_insights_dashboard  # assume this exists
-from segmentation_analysis import segmentation_analysis_dashboard     # assume this exists
-from correlation_analysis import correlation_analysis_dashboard         # assume this exists
-from time_series_decomposition import time_series_decomposition_dashboard   # assume this exists
-from calendar_insights import calendar_insights_dashboard                   # assume this exists
-from climate_insights import climate_insights_dashboard                     # assume this exists
-from scenario_simulation import scenario_simulation_dashboard               # assume this exists
-from reporting import reporting_dashboard                                   # assume this exists
+from detailed_analysis import detailed_analysis_dashboard
+from ai_based_alerts import ai_based_alerts_dashboard
+from forecasting import forecasting_dashboard
+from country_level_insights import country_level_insights_dashboard
+from segmentation_analysis import segmentation_analysis_dashboard
+from correlation_analysis import correlation_analysis_dashboard
+from time_series_decomposition import time_series_decomposition_dashboard
+from calendar_insights import calendar_insights_dashboard
+from climate_insights import climate_insights_dashboard
+from scenario_simulation import scenario_simulation_dashboard
+from reporting import reporting_dashboard
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -63,8 +63,8 @@ def load_csv(file) -> pd.DataFrame:
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Convert the Tons column to numeric and create a 'Period' column from Month and Year.
-    If Month is numeric, it is parsed as a month number; otherwise, as an abbreviated month.
+    Convert the 'Tons' column to numeric and create a 'Period' column from 'Month' and 'Year'.
+    If the Month value is numeric, it is parsed as a month number; otherwise, as an abbreviated month.
     """
     if "Tons" in df.columns:
         df["Tons"] = pd.to_numeric(
@@ -91,7 +91,10 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     return df.convert_dtypes()
 
 def upload_data():
-    """Display an upload widget and load/process data from CSV or Google Sheets."""
+    """
+    Display an upload widget to load data either from a CSV file or a Google Sheet.
+    If a permanent Google Sheet link is provided in config.py, it will be used automatically.
+    """
     st.markdown("<h2>📂 Upload or Link Trade Data</h2>", unsafe_allow_html=True)
     if "data" in st.session_state:
         st.info("Data already loaded.")
@@ -104,7 +107,12 @@ def upload_data():
         if file:
             df = load_csv(file)
     else:
-        sheet_url = st.text_input("Enter Google Sheet URL:")
+        # If a permanent Google Sheet link is configured, use it.
+        if config.USE_PERMANENT_GOOGLE_SHEET_LINK:
+            sheet_url = config.PERMANENT_GOOGLE_SHEET_LINK
+            st.info("Using permanent Google Sheet link from configuration.")
+        else:
+            sheet_url = st.text_input("Enter Google Sheet URL:")
         if sheet_url and st.button("Load Google Sheet"):
             try:
                 sheet_id = sheet_url.split("/d/")[1].split("/")[0]
@@ -118,7 +126,7 @@ def upload_data():
     if df is not None and not df.empty:
         df = preprocess_data(df)
         st.session_state["data"] = df
-        # Apply global filters from filters.py
+        # Apply global filters
         filtered_df, _ = apply_filters(df)
         st.session_state["filtered_data"] = filtered_df
         st.success("✅ Data loaded and preprocessed successfully!")
@@ -150,7 +158,7 @@ def display_footer():
 def main():
     st.set_page_config(page_title="Trade Data Dashboard", layout="wide", initial_sidebar_state="expanded")
     
-    # Authentication
+    # Authentication and logout controls.
     authenticate_user()
     logout_button()
     
@@ -178,13 +186,18 @@ def main():
         st.header("Executive Summary & Data Upload")
         df = upload_data()
         if df is not None and not df.empty:
-            st.sidebar.download_button("📥 Download Processed Data", df.to_csv(index=False).encode("utf-8"), "processed_data.csv", "text/csv")
+            st.sidebar.download_button(
+                "📥 Download Processed Data",
+                df.to_csv(index=False).encode("utf-8"),
+                "processed_data.csv",
+                "text/csv"
+            )
     else:
         df = get_current_data()
         if df is None or df.empty:
             st.error("No data available. Please upload data on the Home page.")
         else:
-            # Optionally, reapply global filters on every page.
+            # Reapply global filters on every page.
             filtered_df, _ = apply_filters(df)
             if selected_page == "Market Overview":
                 market_overview_dashboard(filtered_df)
