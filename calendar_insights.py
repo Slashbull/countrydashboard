@@ -1,20 +1,14 @@
 # calendar_insights.py
 import streamlit as st
-import altair as alt
+import pandas as pd
+import plotly.express as px
 
-def show_calendar_insights():
-    st.header("Calendar/Business Cycle Insights")
-    from core_system import data  # Global data
-    from filters import add_filters
-    df_filtered = add_filters(data)
-    pivot = df_filtered.pivot_table(index="Month", columns="Year", values="Tons", aggfunc="mean")
-    st.write("Average Monthly Tonnage by Year:")
-    st.dataframe(pivot)
-    df_filtered['Month_Str'] = df_filtered['Month'].astype(str)
-    heat = alt.Chart(df_filtered).mark_rect().encode(
-        x=alt.X("Year:N", title="Year"),
-        y=alt.Y("Month_Str:N", title="Month"),
-        color=alt.Color("mean(Tons):Q", title="Avg Tonnage"),
-        tooltip=[alt.Tooltip("mean(Tons):Q", format=",.2f")]
-    ).properties(width=700, height=400)
-    st.altair_chart(heat, use_container_width=True)
+def calendar_insights_dashboard(data: pd.DataFrame):
+    st.header("🗓 Calendar Insights")
+    if "Period_dt" not in data.columns:
+        st.error("Date column missing. Ensure data is preprocessed.")
+        return
+    data["Month_Name"] = data["Period_dt"].dt.strftime("%B")
+    monthly = data.groupby("Month_Name")["Tons"].sum().reset_index()
+    fig = px.bar(monthly, x="Month_Name", y="Tons", title="Volume by Month")
+    st.plotly_chart(fig, use_container_width=True)
