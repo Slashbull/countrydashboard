@@ -7,19 +7,18 @@ from rapidfuzz import process, fuzz
 
 logger = logging.getLogger(__name__)
 
-# For sorting months if they are provided in abbreviated form.
+# For sorting months when provided in abbreviated form.
 MONTH_ORDER = {
     "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
     "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
 }
 
 def dynamic_multiselect(label: str, column: str, df: pd.DataFrame):
-    """Create a sidebar multiselect for a given column."""
+    """Create a sidebar multiselect for the specified column."""
     if column not in df.columns:
         st.sidebar.error(f"Column '{column}' not found in data.")
         return []
     options = df[column].dropna().unique().tolist()
-    # If filtering months, sort by the predefined order.
     if column == "Month":
         options = sorted(options, key=lambda m: MONTH_ORDER.get(m, 99))
     else:
@@ -28,7 +27,11 @@ def dynamic_multiselect(label: str, column: str, df: pd.DataFrame):
     return options if not selected else selected
 
 def apply_filters(df: pd.DataFrame):
-    """Display global filters in the sidebar and apply them to the DataFrame."""
+    """
+    Display global filters in the sidebar and apply them to the DataFrame.
+    Filters include: Year, Month, and Partner.
+    Returns the filtered DataFrame and the name of the unit column.
+    """
     st.sidebar.header("🔍 Global Data Filters")
     filtered_df = df.copy()
     
