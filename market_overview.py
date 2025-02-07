@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 
-def market_overview_dashboard(data: pd.DataFrame):
+def market_overview(data: pd.DataFrame):
     st.title("📊 Market Overview Dashboard")
     
     # Verify required columns
@@ -17,20 +17,18 @@ def market_overview_dashboard(data: pd.DataFrame):
     # Convert 'Tons' to numeric
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
     
-    # Create an ordered Period column if not already present
+    # Create an ordered 'Period' column if not present
     if "Period" not in data.columns:
         try:
+            # Try to parse Month and Year; assuming Month is either numeric or abbreviated text.
             def parse_period(row):
-                # If Month is numeric, parse as month number; otherwise assume abbreviated month name.
                 month_val = row["Month"]
                 year_val = str(row["Year"])
                 if str(month_val).isdigit():
                     return datetime.strptime(f"{int(month_val)} {year_val}", "%m %Y")
                 else:
                     return datetime.strptime(f"{month_val} {year_val}", "%b %Y")
-            
             data["Period_dt"] = data.apply(parse_period, axis=1)
-            # Create an ordered list of period labels (e.g., "Jan-2012")
             sorted_periods = sorted(data["Period_dt"].dropna().unique())
             period_labels = [dt.strftime("%b-%Y") for dt in sorted_periods]
             data["Period"] = data["Period_dt"].dt.strftime("%b-%Y")
@@ -39,15 +37,18 @@ def market_overview_dashboard(data: pd.DataFrame):
             st.error("Error creating Period column. Please check Month and Year formats.")
             return
 
-    # Define Tabs for multi‑view analysis
+    # Use filtered data if available; otherwise, use raw data.
+    filtered_data = st.session_state.get("filtered_data", data)
+
+    # Create tabs for multi-view analysis.
     tabs = st.tabs(["Summary", "Trends", "Breakdown", "Detailed Analysis"])
 
     ### Tab 1: Summary
     with tabs[0]:
         st.header("Key Performance Indicators")
-        total_volume = data["Tons"].sum()
-        unique_partners = data["Partner"].nunique()
-        unique_reporters = data["Reporter"].nunique()
+        total_volume = filtered_data["Tons"].sum()
+        unique_partners = filtered_data["Partner"].nunique()
+        unique_reporters = filtered_data["Reporter"].nunique()
         avg_volume = total_volume / unique_partners if unique_partners > 0 else 0
 
         # Calculate Month-over-Month (MoM) growth if there are at least two periods.
@@ -55,8 +56,8 @@ def market_overview_dashboard(data: pd.DataFrame):
         if len(periods) >= 2:
             last_period = periods[-1]
             second_last_period = periods[-2]
-            vol_last = data[data["Period"] == last_period]["Tons"].sum()
-            vol_prev = data[data["Period"] == second_last_period]["Tons"].sum()
+            vol_last = filtered_data[filtered_data["Period"] == last_period]["Tons"].sum()
+            vol_prev = filtered_data[filtered_data["Period"] == second_last_period]["Tons"].sum()
             mom_growth = ((vol_last - vol_prev) / vol_prev * 100) if vol_prev != 0 else 0
         else:
             mom_growth = 0
@@ -70,7 +71,7 @@ def market_overview_dashboard(data: pd.DataFrame):
 
         st.markdown("---")
         st.subheader("Market Share by Partner")
-        partner_summary = data.groupby("Partner")["Tons"].sum().reset_index()
+        partner_summary = filtered_data.groupby("Partner")["Tons"].sum().reset_index()
         partner_summary["Percentage"] = partner_summary["Tons"] / partner_summary["Tons"].sum() * 100
         fig_donut = px.pie(partner_summary, names="Partner", values="Tons", 
                            title="Market Share by Partner", hole=0.4,
@@ -79,17 +80,36 @@ def market_overview_dashboard(data: pd.DataFrame):
 
     ### Tab 2: Trends
     with tabs[1]:
-        st.header("Monthly Trends")
-        monthly_trends = data.groupby("Period")["Tons"].sum().reset_index()
-        fig_line = px.line(monthly_trends, x="Period", y="Tons", 
-                           title="Monthly Trade Volume Trend", markers=True)
-        st.plotly_chart(fig_line, use_container_width=True)
+        st.header("Monthly & Yearly Trends")
+        
+        # Monthly Trends: use the filtered data
+        if filtered_data.empty:
+            st.warning("No data available for trends analysis.")
+        else:
+            monthly_trends = filtered_data.groupby("Period")["Tons"].sum().reset_index()
+            # Create a line chart that automatically adjusts margins and uses container width
+            fig_line = px.line(monthly_trends, x="Period", y="Tons", 
+                               title="Monthly Trade Volume Trend", markers=True)
+            fig_line.update_layout(
+                autosize=True,
+                margin=dict(l=40, r=40, t=40, b=40),
+                xaxis_title="Period",
+                yaxis_title="Volume (Tons)"
+            )
+            st.plotly_chart(fig_line, use_container_width=True)
+        
         st.markdown("---")
-        st.subheader("Yearly Trends")
-        if "Year" in data.columns:
-            yearly_trends = data.groupby("Year")["Tons"].sum().reset_index()
+        # Yearly Trends: group by Year
+        if "Year" in filtered_data.columns:
+            yearly_trends = filtered_data.groupby("Year")["Tons"].sum().reset_index()
             fig_year = px.bar(yearly_trends, x="Year", y="Tons", 
                               title="Yearly Trade Volume", text_auto=True)
+            fig_year.update_layout(
+                autosize=True,
+                margin=dict(l=40, r=40, t=40, b=40),
+                xaxis_title="Year",
+                yaxis_title="Volume (Tons)"
+            )
             st.plotly_chart(fig_year, use_container_width=True)
         else:
             st.info("Year information not available.")
@@ -98,14 +118,15 @@ def market_overview_dashboard(data: pd.DataFrame):
     with tabs[2]:
         st.header("Breakdown Analysis")
         st.subheader("Top 5 Reporters")
-        reporter_summary = (data.groupby("Reporter")["Tons"]
+        reporter_summary = (filtered_data.groupby("Reporter")["Tons"]
                               .sum().reset_index().sort_values("Tons", ascending=False)
                               .head(5))
         fig_reporter = px.bar(reporter_summary, x="Reporter", y="Tons",
                               title="Top 5 Reporters by Volume", text_auto=True)
         st.plotly_chart(fig_reporter, use_container_width=True)
+        
         st.subheader("Top 5 Partners")
-        partner_top = (data.groupby("Partner")["Tons"]
+        partner_top = (filtered_data.groupby("Partner")["Tons"]
                        .sum().reset_index().sort_values("Tons", ascending=False)
                        .head(5))
         fig_partner = px.bar(partner_top, x="Partner", y="Tons",
@@ -116,10 +137,10 @@ def market_overview_dashboard(data: pd.DataFrame):
     with tabs[3]:
         st.header("Detailed Analysis")
         st.markdown("Use the controls below to drill down into the data.")
-        # Example: let the user select a Reporter to analyze
-        reporters = sorted(data["Reporter"].dropna().unique().tolist())
+        # Let the user select a Reporter for detailed analysis.
+        reporters = sorted(filtered_data["Reporter"].dropna().unique().tolist())
         selected_reporter = st.selectbox("Select Reporter", reporters)
-        reporter_data = data[data["Reporter"] == selected_reporter]
+        reporter_data = filtered_data[filtered_data["Reporter"] == selected_reporter]
         st.subheader(f"Trade Data for Reporter: {selected_reporter}")
         st.dataframe(reporter_data)
         
