@@ -10,7 +10,7 @@ from datetime import datetime
 import config
 from filters import apply_filters
 
-# Import dashboard modules (assumed to exist)
+# Import dashboard modules
 from market_overview import market_overview_dashboard
 from detailed_analysis import detailed_analysis_dashboard
 from ai_based_alerts import ai_based_alerts_dashboard
@@ -30,8 +30,7 @@ logger = logging.getLogger(__name__)
 
 def authenticate_user():
     """Display a login form in the sidebar and authenticate the user."""
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
+    st.session_state.setdefault("authenticated", False)
     if not st.session_state["authenticated"]:
         st.sidebar.title("🔒 Login")
         username = st.sidebar.text_input("Username", key="username")
@@ -63,8 +62,8 @@ def load_csv(file) -> pd.DataFrame:
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Convert the 'Tons' column to numeric and create a 'Period' column from 'Month' and 'Year'.
-    If the Month value is numeric, it is parsed as a month number; otherwise, as an abbreviated month.
+    Convert the 'Tons' column to numeric and create a 'Period' column from Month and Year.
+    If Month is numeric, it is parsed as a month number; otherwise, as an abbreviated month.
     """
     if "Tons" in df.columns:
         df["Tons"] = pd.to_numeric(
@@ -92,47 +91,64 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def upload_data():
     """
-    Display an upload widget to load data either from a CSV file or a Google Sheet.
-    If a permanent Google Sheet link is provided in config.py, it will be used automatically.
+    Handle data ingestion:
+      - If a Google Sheet link is defined in config, load data automatically.
+      - Otherwise, prompt the user to either upload a CSV file or provide a Google Sheet link.
+      - Preprocess and cache the data in session state.
     """
-    st.markdown("<h2>📂 Upload or Link Trade Data</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>📂 Upload or Link Trade Data</h2>", unsafe_allow_html=True)
+    
     if "data" in st.session_state:
         st.info("Data already loaded.")
         return st.session_state["data"]
-    
-    option = st.radio("Choose Data Source:", ("Upload CSV", "Google Sheet Link"))
+
     df = None
-    if option == "Upload CSV":
-        file = st.file_uploader("Upload CSV File", type=["csv"], help="Upload your trade data CSV.")
-        if file:
-            df = load_csv(file)
-    else:
-        # If a permanent Google Sheet link is configured, use it.
-        if config.USE_PERMANENT_GOOGLE_SHEET_LINK:
-            sheet_url = config.PERMANENT_GOOGLE_SHEET_LINK
-            st.info("Using permanent Google Sheet link from configuration.")
+    # Auto-load from Google Sheet if configured.
+    if config.GOOGLE_SHEET_LINK:
+        st.info("Loading data from the configured Google Sheet...")
+        sheet_url = config.GOOGLE_SHEET_LINK
+        sheet_name = config.DEFAULT_SHEET_NAME
+        try:
+            sheet_id = sheet_url.split("/d/")[1].split("/")[0]
+            csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+            response = requests.get(csv_url)
+            response.raise_for_status()
+            df = pd.read_csv(StringIO(response.text), low_memory=False)
+            st.success("✅ Google Sheet loaded successfully from configuration.")
+        except Exception as e:
+            st.error(f"🚨 Error loading Google Sheet from config: {e}")
+            logger.error("Error loading Google Sheet from config: %s", e)
+    
+    if df is None:
+        upload_option = st.radio("📥 Choose Data Source:", ("Upload CSV", "Google Sheet Link"), index=0)
+        if upload_option == "Upload CSV":
+            file = st.file_uploader("Upload CSV File", type=["csv"], help="Upload your trade data CSV.")
+            if file:
+                df = load_csv(file)
         else:
-            sheet_url = st.text_input("Enter Google Sheet URL:")
-        if sheet_url and st.button("Load Google Sheet"):
-            try:
-                sheet_id = sheet_url.split("/d/")[1].split("/")[0]
-                csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
-                response = requests.get(csv_url)
-                response.raise_for_status()
-                df = pd.read_csv(StringIO(response.text), low_memory=False)
-            except Exception as e:
-                st.error(f"🚨 Error loading Google Sheet: {e}")
-                logger.error("Google Sheet load error: %s", e)
+            sheet_url = st.text_input("🔗 Enter Google Sheet Link:")
+            sheet_name = config.DEFAULT_SHEET_NAME
+            if sheet_url and st.button("Load Google Sheet"):
+                try:
+                    sheet_id = sheet_url.split("/d/")[1].split("/")[0]
+                    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+                    response = requests.get(csv_url)
+                    response.raise_for_status()
+                    df = pd.read_csv(StringIO(response.text), low_memory=False)
+                except Exception as e:
+                    st.error(f"🚨 Error loading Google Sheet: {e}")
+                    logger.error("Error loading Google Sheet: %s", e)
+    
     if df is not None and not df.empty:
         df = preprocess_data(df)
         st.session_state["data"] = df
-        # Apply global filters
+        st.sidebar.header("Filters")
         filtered_df, _ = apply_filters(df)
         st.session_state["filtered_data"] = filtered_df
-        st.success("✅ Data loaded and preprocessed successfully!")
+        st.success("✅ Data loaded and filtered successfully!")
         logger.info("Data loaded.")
     else:
-        st.info("No data loaded yet. Please upload or link a data source.")
+        st.info("No data loaded yet. Please upload a file or provide a valid Google Sheet link.")
     return df
 
 def reset_data():
@@ -147,20 +163,16 @@ def get_current_data():
     return st.session_state.get("filtered_data", st.session_state.get("data"))
 
 def display_footer():
-    """Display a footer at the bottom of the app."""
+    """Display a simple footer."""
     footer_html = """
     <div style="text-align: center; padding: 10px; color: #666;">
-      © 2025 TradeDataDashboard. All rights reserved.
+        © 2025 TradeDataDashboard. All rights reserved.
     </div>
     """
     st.markdown(footer_html, unsafe_allow_html=True)
 
 def main():
     st.set_page_config(page_title="Trade Data Dashboard", layout="wide", initial_sidebar_state="expanded")
-    
-    # Authentication and logout controls.
-    authenticate_user()
-    logout_button()
     
     # Sidebar Navigation
     pages = [
@@ -181,7 +193,7 @@ def main():
     selected_page = st.sidebar.radio("Navigation", pages, index=0)
     st.session_state["page"] = selected_page
 
-    # Data upload and reset button
+    # Data upload and reset buttons.
     if selected_page == "Home":
         st.header("Executive Summary & Data Upload")
         df = upload_data()
@@ -197,7 +209,7 @@ def main():
         if df is None or df.empty:
             st.error("No data available. Please upload data on the Home page.")
         else:
-            # Reapply global filters on every page.
+            # Reapply global filters.
             filtered_df, _ = apply_filters(df)
             if selected_page == "Market Overview":
                 market_overview_dashboard(filtered_df)
@@ -227,4 +239,6 @@ def main():
     display_footer()
 
 if __name__ == "__main__":
+    authenticate_user()
+    logout_button()
     main()
