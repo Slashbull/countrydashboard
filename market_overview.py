@@ -1,3 +1,4 @@
+# market_overview.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -13,7 +14,7 @@ def market_overview_dashboard(data: pd.DataFrame):
         st.error(f"🚨 Missing columns: {', '.join(missing)}")
         return
 
-    # Convert the 'Tons' column to numeric.
+    # Ensure the 'Tons' column is numeric.
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
     
     # Work on a copy of the data.
@@ -25,6 +26,7 @@ def market_overview_dashboard(data: pd.DataFrame):
             def parse_period(row):
                 m = row["Month"]
                 y = str(row["Year"])
+                # If Month is numeric, parse it as a month number; otherwise, assume abbreviated month name.
                 if str(m).isdigit():
                     return datetime.strptime(f"{int(m)} {y}", "%m %Y")
                 else:
@@ -33,13 +35,14 @@ def market_overview_dashboard(data: pd.DataFrame):
             sorted_periods = sorted(df["Period_dt"].dropna().unique())
             period_labels = [dt.strftime("%b-%Y") for dt in sorted_periods]
             df["Period"] = df["Period_dt"].dt.strftime("%b-%Y")
+            # Enforce proper order using a categorical type.
             df["Period"] = pd.Categorical(df["Period"], categories=period_labels, ordered=True)
         except Exception as e:
             st.error("Error creating 'Period' column. Please check Month and Year formats.")
             st.error(e)
             return
 
-    # --- Dashboard Layout with Tabs ---
+    # --- Create the Dashboard Layout with Tabs ---
     tabs = st.tabs(["Summary", "Trends", "Breakdown", "Detailed Analysis"])
 
     ### Tab 1: Summary
@@ -82,7 +85,8 @@ def market_overview_dashboard(data: pd.DataFrame):
             values="Tons", 
             title="Market Share by Partner", 
             hole=0.4,
-            hover_data={"Percentage":":.2f"}
+            hover_data={"Percentage":":.2f"},
+            template="plotly_white"
         )
         st.plotly_chart(fig_donut, use_container_width=True)
 
@@ -92,21 +96,19 @@ def market_overview_dashboard(data: pd.DataFrame):
         
         # --- Overall Monthly Trends ---
         st.subheader("Overall Monthly Trends")
-        # Group data by the categorical 'Period' to preserve proper order.
         monthly_trends = df.groupby("Period")["Tons"].sum().reset_index()
-        # Use 'Period' directly (the x-axis will follow the categorical order)
         fig_line = px.line(
             monthly_trends,
             x="Period",
             y="Tons",
             title="Monthly Import Trends",
-            markers=True
+            markers=True,
+            template="plotly_white"
         )
         fig_line.update_layout(
             xaxis_title="Period",
             yaxis_title="Volume (Tons)",
-            margin=dict(l=40, r=40, t=40, b=40),
-            template="plotly_white"
+            margin=dict(l=40, r=40, t=40, b=40)
         )
         st.plotly_chart(fig_line, use_container_width=True)
         
@@ -115,7 +117,7 @@ def market_overview_dashboard(data: pd.DataFrame):
         if df["Year"].nunique() > 1:
             st.markdown("#### Trends by Year")
             yearly_trends = df.groupby(["Year", "Month"])["Tons"].sum().reset_index()
-            # Convert numeric month to abbreviated text if necessary.
+            # Convert numeric month to abbreviated text if needed.
             def convert_month(m):
                 try:
                     m_int = int(m)
@@ -133,13 +135,13 @@ def market_overview_dashboard(data: pd.DataFrame):
                 y="Tons",
                 color="Year",
                 title="Monthly Trends by Year",
-                markers=True
+                markers=True,
+                template="plotly_white"
             )
             fig_yearly.update_layout(
                 xaxis_title="Month",
                 yaxis_title="Volume (Tons)",
-                margin=dict(l=40, r=40, t=40, b=40),
-                template="plotly_white"
+                margin=dict(l=40, r=40, t=40, b=40)
             )
             st.plotly_chart(fig_yearly, use_container_width=True)
         else:
