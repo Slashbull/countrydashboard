@@ -19,7 +19,7 @@ def market_overview_dashboard(data: pd.DataFrame):
     # Work on a copy of the data.
     df = data.copy()
     
-    # --- Create the 'Period' column if not present ---
+    # --- Create the 'Period' column if not already present ---
     if "Period" not in df.columns:
         try:
             def parse_period(row):
@@ -50,7 +50,7 @@ def market_overview_dashboard(data: pd.DataFrame):
         unique_reporters = df["Reporter"].nunique()
         avg_volume = total_volume / unique_partners if unique_partners > 0 else 0
 
-        # Calculate Month-over-Month (MoM) Growth
+        # Calculate Month-over-Month (MoM) Growth.
         if "Period_dt" in df.columns:
             periods_sorted = df.sort_values("Period_dt")["Period"].unique()
         else:
@@ -89,27 +89,33 @@ def market_overview_dashboard(data: pd.DataFrame):
     ### Tab 2: Trends
     with tabs[1]:
         st.header("Monthly & Yearly Trends")
+        
+        # --- Overall Monthly Trends ---
         st.subheader("Overall Monthly Trends")
+        # Group data by the categorical 'Period' to preserve proper order.
         monthly_trends = df.groupby("Period")["Tons"].sum().reset_index()
-        monthly_trends["Period_str"] = monthly_trends["Period"].astype(str)
+        # Use 'Period' directly (the x-axis will follow the categorical order)
         fig_line = px.line(
-            monthly_trends, 
-            x="Period_str", 
+            monthly_trends,
+            x="Period",
             y="Tons",
-            title="Monthly Import Trends", 
+            title="Monthly Import Trends",
             markers=True
         )
         fig_line.update_layout(
             xaxis_title="Period",
             yaxis_title="Volume (Tons)",
-            margin=dict(l=40, r=40, t=40, b=40)
+            margin=dict(l=40, r=40, t=40, b=40),
+            template="plotly_white"
         )
         st.plotly_chart(fig_line, use_container_width=True)
         
         st.markdown("---")
+        # --- Trends by Year ---
         if df["Year"].nunique() > 1:
             st.markdown("#### Trends by Year")
             yearly_trends = df.groupby(["Year", "Month"])["Tons"].sum().reset_index()
+            # Convert numeric month to abbreviated text if necessary.
             def convert_month(m):
                 try:
                     m_int = int(m)
@@ -129,11 +135,18 @@ def market_overview_dashboard(data: pd.DataFrame):
                 title="Monthly Trends by Year",
                 markers=True
             )
+            fig_yearly.update_layout(
+                xaxis_title="Month",
+                yaxis_title="Volume (Tons)",
+                margin=dict(l=40, r=40, t=40, b=40),
+                template="plotly_white"
+            )
             st.plotly_chart(fig_yearly, use_container_width=True)
         else:
             st.info("Not enough year information for Trends by Year.")
 
         st.markdown("---")
+        # --- Yearly Trade Volume ---
         if "Year" in df.columns:
             st.subheader("Yearly Trade Volume")
             yearly_total = df.groupby("Year", as_index=False)["Tons"].sum().sort_values("Year")
@@ -142,7 +155,8 @@ def market_overview_dashboard(data: pd.DataFrame):
                 x="Year",
                 y="Tons",
                 title="Yearly Trade Volume",
-                text_auto=True
+                text_auto=True,
+                template="plotly_white"
             )
             st.plotly_chart(fig_year, use_container_width=True)
         else:
@@ -159,7 +173,8 @@ def market_overview_dashboard(data: pd.DataFrame):
             x="Partner",
             y="Tons",
             title="Top 5 Partners by Volume",
-            text_auto=True
+            text_auto=True,
+            template="plotly_white"
         )
         st.plotly_chart(fig_partner, use_container_width=True)
         
@@ -171,7 +186,8 @@ def market_overview_dashboard(data: pd.DataFrame):
                 names="Flow",
                 values="Tons",
                 title="Volume Distribution by Flow",
-                hole=0.4
+                hole=0.4,
+                template="plotly_white"
             )
             st.plotly_chart(fig_flow, use_container_width=True)
         else:
@@ -211,7 +227,8 @@ def market_overview_dashboard(data: pd.DataFrame):
             x="Period",
             y="Tons",
             title=f"Trade Volume Trend for {selected_entity}",
-            markers=True
+            markers=True,
+            template="plotly_white"
         )
         st.plotly_chart(fig_entity, use_container_width=True)
         st.success("Detailed Analysis loaded successfully!")
