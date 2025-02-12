@@ -48,7 +48,7 @@ def authenticate_user():
             if username == config.USERNAME and password == config.PASSWORD:
                 st.session_state["authenticated"] = True
                 logger.info("User %s authenticated successfully.", username)
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.sidebar.error("🚨 Invalid credentials")
                 logger.warning("Failed login attempt for username: %s", username)
@@ -59,7 +59,7 @@ def logout_button():
     if st.sidebar.button("🔓 Logout"):
         st.session_state.clear()
         logger.info("User logged out.")
-        st.experimental_rerun()
+        st.rerun()
 
 # -----------------------------------------------------------------------------
 # DATA LOADING AND PREPROCESSING FUNCTIONS
@@ -174,7 +174,7 @@ def reset_data():
         st.session_state.pop("data", None)
         st.session_state.pop("filtered_data", None)
         logger.info("Data reset by user.")
-        st.experimental_rerun()
+        st.rerun()
 
 def get_current_data():
     """Return filtered data if available; otherwise, return raw uploaded data."""
