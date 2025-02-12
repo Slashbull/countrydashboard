@@ -6,23 +6,23 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 def detailed_analysis_dashboard(data: pd.DataFrame):
-    st.title("🔍 Detailed Analysis")
-
-    # Validate required columns.
+    st.title("🔍 Detailed Analysis Dashboard")
+    
+    # Validate that required columns exist.
     required_cols = ["Reporter", "Partner", "Tons", "Year", "Month", "Period"]
     missing = [col for col in required_cols if col not in data.columns]
     if missing:
         st.error(f"🚨 Missing required columns: {', '.join(missing)}")
         return
 
-    # Ensure Tons is numeric.
+    # Ensure "Tons" is numeric.
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
-
+    
     # Create three main tabs.
     tabs = st.tabs(["Summary", "Partners Breakdown & Trends", "Detailed Partner Analysis"])
 
     #########################################################
-    # Tab 1: Summary - Overall KPIs and Growth Metrics
+    # Tab 1: Summary – Overall KPIs and Growth Metrics
     #########################################################
     with tabs[0]:
         st.header("Overall Summary")
@@ -34,8 +34,7 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
         unique_partners = data["Partner"].nunique()
         avg_volume_partner = total_volume / unique_partners if unique_partners > 0 else 0
 
-        # Calculate Month-over-Month (MoM) Growth
-        # We assume data is sorted by a proper Period; use the "Period_dt" if available.
+        # Calculate Month-over-Month (MoM) Growth.
         if "Period_dt" in data.columns:
             periods_sorted = data.sort_values("Period_dt")["Period"].unique()
         else:
@@ -59,18 +58,23 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
         else:
             top_partner, top_partner_share = "N/A", 0
 
-        # Display metrics in columns.
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        # Display KPIs using columns.
+        col1, col2, col3 = st.columns(3)
         col1.metric("Total Volume (Tons)", f"{total_volume:,.2f}")
-        col2.metric("Total Records", total_records)
-        col3.metric("Avg Volume/Record", f"{avg_volume_record:,.2f}")
-        col4.metric("Unique Partners", unique_partners)
-        col5.metric("Avg Volume/Partner", f"{avg_volume_partner:,.2f}")
-        col6.metric("MoM Growth (%)", f"{mom_growth:,.2f}")
+        col1.metric("Total Records", total_records)
+        col2.metric("Avg Volume/Record", f"{avg_volume_record:,.2f}")
+        col2.metric("Unique Partners", unique_partners)
+        col3.metric("Avg Volume/Partner", f"{avg_volume_partner:,.2f}")
+        col3.metric("MoM Growth (%)", f"{mom_growth:,.2f}")
 
         st.markdown("---")
-        st.subheader("Top Partner")
+        st.subheader("Top Partner Performance")
         st.write(f"**{top_partner}** contributes **{top_partner_share:,.2f}%** of total volume.")
+
+        # Optional: Show the last updated period if available.
+        if "Period_dt" in data.columns:
+            last_updated = data["Period_dt"].max().strftime("%b-%Y")
+            st.info(f"Data last updated: {last_updated}")
 
     #########################################################
     # Tab 2: Partners Breakdown & Trends
@@ -78,7 +82,7 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
     with tabs[1]:
         st.header("Partners Breakdown & Trends")
 
-        # --- Breakdown by Partner ---
+        # Bar Chart: Volume by Partner.
         st.subheader("Volume by Partner")
         partner_breakdown = data.groupby("Partner", as_index=False)["Tons"].sum()
         partner_breakdown = partner_breakdown.sort_values("Tons", ascending=False)
@@ -93,7 +97,7 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
         st.plotly_chart(fig_bar, use_container_width=True)
 
         st.markdown("---")
-        # --- Donut Chart for Market Share ---
+        # Donut Chart: Market Share by Partner.
         st.subheader("Market Share by Partner")
         total_partner_volume = partner_breakdown["Tons"].sum()
         partner_breakdown["Share (%)"] = (partner_breakdown["Tons"] / total_partner_volume) * 100
@@ -109,18 +113,15 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
         st.plotly_chart(fig_donut, use_container_width=True)
 
         st.markdown("---")
-        # --- Growth Analysis: Compute recent period growth per partner ---
-        st.subheader("Recent Growth by Partner")
-        # Ensure there are at least two periods.
+        # Growth Analysis: Recent Month-over-Month Growth by Partner.
+        st.subheader("Recent Month-over-Month Growth by Partner")
         if len(data["Period"].unique()) >= 2:
-            # Get the latest period
             latest = data["Period"].unique()[-1]
             previous = data["Period"].unique()[-2]
-            # Compute volume change per partner between the two periods.
             vol_latest = data[data["Period"] == latest].groupby("Partner")["Tons"].sum()
             vol_previous = data[data["Period"] == previous].groupby("Partner")["Tons"].sum()
             growth = ((vol_latest - vol_previous) / vol_previous * 100).replace([float('inf'), -float('inf')], 0)
-            growth_df = growth.reset_index().rename(columns={0: "Growth (%)"})
+            growth_df = growth.reset_index()
             growth_df.columns = ["Partner", "Growth (%)"]
             growth_df["Growth (%)"] = growth_df["Growth (%)"].round(2)
             growth_df = growth_df.sort_values("Growth (%)", ascending=False)
@@ -129,7 +130,7 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
                 growth_df,
                 x="Partner",
                 y="Growth (%)",
-                title="Recent Month-over-Month Growth by Partner",
+                title="Recent MoM Growth by Partner",
                 text_auto=True,
                 template="plotly_white",
                 color="Growth (%)",
@@ -140,20 +141,18 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
             st.info("Not enough period data to compute growth metrics.")
 
     #########################################################
-    # Tab 3: Detailed Partner Analysis (Monthly & Yearly)
+    # Tab 3: Detailed Partner Analysis
     #########################################################
     with tabs[2]:
         st.header("Detailed Partner Analysis")
         st.markdown("Drill down into a specific partner for granular insights.")
-        
-        # Let user choose a partner.
+
         partners = sorted(data["Partner"].dropna().unique().tolist())
         selected_partner = st.selectbox("Select a Partner:", partners)
         partner_data = data[data["Partner"] == selected_partner]
         st.subheader(f"Trade Data for Partner: {selected_partner}")
         st.dataframe(partner_data)
 
-        # Pivot Table: Monthly Analysis
         st.markdown("##### Monthly Analysis")
         try:
             monthly_pivot = pd.pivot_table(
@@ -167,11 +166,9 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
         except Exception as e:
             st.error("Error generating monthly pivot table.")
             st.error(e)
-        
-        # Trend Chart: Monthly Volume Trend for the selected partner.
+
         st.markdown("##### Monthly Trend")
-        monthly_trend = partner_data.groupby("Period", as_index=False)["Tons"].sum()
-        monthly_trend = monthly_trend.sort_values("Period")
+        monthly_trend = partner_data.groupby("Period", as_index=False)["Tons"].sum().sort_values("Period")
         fig_partner_trend = px.line(
             monthly_trend,
             x="Period",
@@ -182,7 +179,6 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
         )
         st.plotly_chart(fig_partner_trend, use_container_width=True)
 
-        # Yearly Analysis (if Year column is available)
         if "Year" in partner_data.columns:
             st.markdown("##### Yearly Analysis")
             try:
@@ -208,7 +204,13 @@ def detailed_analysis_dashboard(data: pd.DataFrame):
                 st.error(e)
         else:
             st.info("Year information not available for this partner.")
-
+        
+        st.download_button(
+            label="Download Partner Data as CSV",
+            data=partner_data.to_csv(index=False).encode("utf-8"),
+            file_name=f"{selected_partner}_data.csv",
+            mime="text/csv"
+        )
         st.success("Detailed Partner Analysis loaded successfully!")
 
     st.success("✅ Detailed Analysis Dashboard loaded successfully!")
