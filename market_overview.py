@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from datetime import datetime
 
 def market_overview_dashboard(data: pd.DataFrame):
@@ -26,7 +27,7 @@ def market_overview_dashboard(data: pd.DataFrame):
             def parse_period(row):
                 m = row["Month"]
                 y = str(row["Year"])
-                # If Month is numeric, parse it as a month number; otherwise, assume abbreviated month name.
+                # If Month is numeric, parse it as a month number; otherwise assume abbreviated month name.
                 if str(m).isdigit():
                     return datetime.strptime(f"{int(m)} {y}", "%m %Y")
                 else:
@@ -42,13 +43,20 @@ def market_overview_dashboard(data: pd.DataFrame):
             st.error(e)
             return
 
-    # --- Create the Dashboard Layout with Tabs ---
+    # --- Additional KPI: Top Partner ---
+    partner_summary = df.groupby("Partner", as_index=False)["Tons"].sum()
+    total_volume = df["Tons"].sum()
+    top_partner_row = partner_summary.sort_values("Tons", ascending=False).iloc[0]
+    top_partner_name = top_partner_row["Partner"]
+    top_partner_volume = top_partner_row["Tons"]
+    top_partner_share = (top_partner_volume / total_volume) * 100 if total_volume > 0 else 0
+
+    # --- Dashboard Layout with Tabs ---
     tabs = st.tabs(["Summary", "Trends", "Breakdown", "Detailed Analysis"])
 
     ### Tab 1: Summary
     with tabs[0]:
         st.header("Key Performance Indicators")
-        total_volume = df["Tons"].sum()
         unique_partners = df["Partner"].nunique()
         unique_reporters = df["Reporter"].nunique()
         avg_volume = total_volume / unique_partners if unique_partners > 0 else 0
@@ -67,18 +75,18 @@ def market_overview_dashboard(data: pd.DataFrame):
         else:
             mom_growth = 0
 
-        col1, col2, col3, col4, col5 = st.columns(5)
+        # Display metrics in columns.
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
         col1.metric("Total Volume (Tons)", f"{total_volume:,.2f}")
         col2.metric("Unique Partners", unique_partners)
         col3.metric("Unique Reporters", unique_reporters)
         col4.metric("Avg Volume/Partner", f"{avg_volume:,.2f}")
         col5.metric("MoM Growth (%)", f"{mom_growth:,.2f}")
-
+        col6.metric("Top Partner", f"{top_partner_name} ({top_partner_share:,.2f}%)")
+        
         st.markdown("---")
         st.subheader("Market Share by Partner")
-        partner_summary = df.groupby("Partner", as_index=False)["Tons"].sum()
-        total_partner_volume = partner_summary["Tons"].sum()
-        partner_summary["Percentage"] = (partner_summary["Tons"] / total_partner_volume) * 100
+        partner_summary["Percentage"] = (partner_summary["Tons"] / total_volume) * 100
         fig_donut = px.pie(
             partner_summary, 
             names="Partner", 
@@ -93,31 +101,43 @@ def market_overview_dashboard(data: pd.DataFrame):
     ### Tab 2: Trends
     with tabs[1]:
         st.header("Monthly & Yearly Trends")
-        
-        # --- Overall Monthly Trends ---
         st.subheader("Overall Monthly Trends")
         monthly_trends = df.groupby("Period")["Tons"].sum().reset_index()
-        fig_line = px.line(
-            monthly_trends,
-            x="Period",
-            y="Tons",
-            title="Monthly Import Trends",
-            markers=True,
-            template="plotly_white"
-        )
+        monthly_trends = monthly_trends.sort_values("Period")
+        # Calculate a 3-period moving average to smooth the trend.
+        monthly_trends["Moving_Avg"] = monthly_trends["Tons"].rolling(window=3, min_periods=1).mean()
+        
+        # Create a combined line chart using Plotly Graph Objects.
+        fig_line = go.Figure()
+        fig_line.add_trace(go.Scatter(
+            x=monthly_trends["Period"],
+            y=monthly_trends["Tons"],
+            mode="lines+markers",
+            name="Actual",
+            line=dict(color="blue")
+        ))
+        fig_line.add_trace(go.Scatter(
+            x=monthly_trends["Period"],
+            y=monthly_trends["Moving_Avg"],
+            mode="lines+markers",
+            name="Moving Average (3 Periods)",
+            line=dict(dash="dash", color="red")
+        ))
         fig_line.update_layout(
+            title="Monthly Import Trends with Moving Average",
             xaxis_title="Period",
             yaxis_title="Volume (Tons)",
-            margin=dict(l=40, r=40, t=40, b=40)
+            margin=dict(l=40, r=40, t=40, b=40),
+            template="plotly_white"
         )
         st.plotly_chart(fig_line, use_container_width=True)
-        
+
         st.markdown("---")
-        # --- Trends by Year ---
+        # Trends by Year (if data spans multiple years)
         if df["Year"].nunique() > 1:
             st.markdown("#### Trends by Year")
             yearly_trends = df.groupby(["Year", "Month"])["Tons"].sum().reset_index()
-            # Convert numeric month to abbreviated text if needed.
+            # Convert numeric month to abbreviated month name if needed.
             def convert_month(m):
                 try:
                     m_int = int(m)
@@ -146,9 +166,9 @@ def market_overview_dashboard(data: pd.DataFrame):
             st.plotly_chart(fig_yearly, use_container_width=True)
         else:
             st.info("Not enough year information for Trends by Year.")
-
+        
         st.markdown("---")
-        # --- Yearly Trade Volume ---
+        # Yearly Trade Volume Bar Chart
         if "Year" in df.columns:
             st.subheader("Yearly Trade Volume")
             yearly_total = df.groupby("Year", as_index=False)["Tons"].sum().sort_values("Year")
@@ -168,8 +188,7 @@ def market_overview_dashboard(data: pd.DataFrame):
     with tabs[2]:
         st.header("Breakdown Analysis")
         st.subheader("Top 5 Partners")
-        partner_top = (df.groupby("Partner", as_index=False)["Tons"]
-                       .sum().sort_values("Tons", ascending=False).head(5))
+        partner_top = df.groupby("Partner", as_index=False)["Tons"].sum().sort_values("Tons", ascending=False).head(5)
         fig_partner = px.bar(
             partner_top,
             x="Partner",
