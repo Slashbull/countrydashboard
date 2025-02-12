@@ -39,7 +39,7 @@ def authenticate_user():
         if st.sidebar.button("Login"):
             if username == config.USERNAME and password == config.PASSWORD:
                 st.session_state["authenticated"] = True
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.sidebar.error("🚨 Invalid credentials")
         st.stop()
@@ -48,7 +48,7 @@ def logout_button():
     """Display a logout button that clears the session."""
     if st.sidebar.button("🔓 Logout"):
         st.session_state.clear()
-        st.experimental_rerun()
+        st.rerun()
 
 @st.cache_data(show_spinner=False)
 def load_csv(file) -> pd.DataFrame:
@@ -150,7 +150,7 @@ def reset_data():
     if st.sidebar.button("Reset Data", key="reset_data"):
         st.session_state.pop("data", None)
         st.session_state.pop("filtered_data", None)
-        st.experimental_rerun()
+        st.rerun()
 
 def get_current_data():
     """Return filtered data if available; otherwise, return raw uploaded data."""
@@ -168,7 +168,7 @@ def display_footer():
 def main():
     st.set_page_config(page_title="Trade Data Dashboard", layout="wide", initial_sidebar_state="expanded")
     
-    # Authentication and Logout controls
+    # Authentication and Logout controls.
     authenticate_user()
     logout_button()
     
