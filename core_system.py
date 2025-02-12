@@ -10,7 +10,7 @@ from datetime import datetime
 import config
 from filters import apply_filters
 
-# Import dashboard modules (assumed to exist)
+# Import dashboard modules
 from market_overview import market_overview_dashboard
 from detailed_analysis import detailed_analysis_dashboard
 from ai_based_alerts import ai_based_alerts_dashboard
@@ -24,14 +24,22 @@ from climate_insights import climate_insights_dashboard
 from scenario_simulation import scenario_simulation_dashboard
 from reporting import reporting_dashboard
 
-# Configure logging
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+log_level = getattr(logging, config.LOG_LEVEL, logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=log_level)
 logger = logging.getLogger(__name__)
+logger.info("Core system starting with log level: %s", config.LOG_LEVEL)
 
+# -----------------------------------------------------------------------------
+# USER AUTHENTICATION & SESSION MANAGEMENT
+# -----------------------------------------------------------------------------
 def authenticate_user():
     """Display a login form in the sidebar and authenticate the user."""
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
+
     if not st.session_state["authenticated"]:
         st.sidebar.title("🔒 Login")
         username = st.sidebar.text_input("Username", key="username")
@@ -39,22 +47,29 @@ def authenticate_user():
         if st.sidebar.button("Login"):
             if username == config.USERNAME and password == config.PASSWORD:
                 st.session_state["authenticated"] = True
-                st.rerun()
+                logger.info("User %s authenticated successfully.", username)
+                st.experimental_rerun()
             else:
                 st.sidebar.error("🚨 Invalid credentials")
+                logger.warning("Failed login attempt for username: %s", username)
         st.stop()
 
 def logout_button():
-    """Display a logout button that clears the session."""
+    """Display a logout button that clears the session state."""
     if st.sidebar.button("🔓 Logout"):
         st.session_state.clear()
-        st.rerun()
+        logger.info("User logged out.")
+        st.experimental_rerun()
 
-@st.cache_data(show_spinner=False)
+# -----------------------------------------------------------------------------
+# DATA LOADING AND PREPROCESSING FUNCTIONS
+# -----------------------------------------------------------------------------
+@st.cache_data(show_spinner=True, max_entries=config.CACHE_MAX_ENTRIES)
 def load_csv(file) -> pd.DataFrame:
     """Load CSV data into a DataFrame with caching."""
     try:
         df = pd.read_csv(file, low_memory=False)
+        logger.info("CSV file loaded successfully with %d records.", df.shape[0])
     except Exception as e:
         st.error(f"🚨 Error loading CSV: {e}")
         logger.error("Error in load_csv: %s", e)
@@ -63,8 +78,8 @@ def load_csv(file) -> pd.DataFrame:
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Convert the 'Tons' column to numeric and create a 'Period' column from 'Month' and 'Year'.
-    If the Month value is numeric, it is parsed as a month number; otherwise, as an abbreviated month.
+    Convert the 'Tons' column to numeric (removing commas if necessary) and create a
+    'Period' column from 'Month' and 'Year'. Supports both numeric and abbreviated month values.
     """
     if "Tons" in df.columns:
         df["Tons"] = pd.to_numeric(
@@ -76,6 +91,8 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
             def parse_period(row):
                 m = row["Month"]
                 y = str(row["Year"])
+                # If Month is numeric, convert to integer and parse as month number;
+                # otherwise assume abbreviated month name.
                 if str(m).isdigit():
                     return datetime.strptime(f"{int(m)} {y}", "%m %Y")
                 else:
@@ -84,34 +101,38 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
             sorted_periods = sorted(df["Period_dt"].dropna().unique())
             period_labels = [dt.strftime("%b-%Y") for dt in sorted_periods]
             df["Period"] = df["Period_dt"].dt.strftime("%b-%Y")
+            # Use a categorical type to enforce proper order on the x-axis in plots.
             df["Period"] = pd.Categorical(df["Period"], categories=period_labels, ordered=True)
+            logger.info("Period column created successfully.")
         except Exception as e:
             st.error("🚨 Error processing date fields. Check Month and Year formats.")
-            logger.error("Date parsing error: %s", e)
+            logger.error("Error in preprocess_data (Period parsing): %s", e)
     return df.convert_dtypes()
 
 def upload_data():
     """
-    Display an upload widget to load data either from a CSV file or a Google Sheet.
-    If a permanent Google Sheet link is configured in config.py, it is loaded automatically.
+    Display an upload widget to load data either from a CSV file or from a permanent
+    Google Sheet link (if configured). Applies preprocessing and global filters.
     """
     st.markdown("<h2>📂 Upload or Link Trade Data</h2>", unsafe_allow_html=True)
     if "data" in st.session_state:
         st.info("Data already loaded.")
         return st.session_state["data"]
-    
+
     df = None
-    # If a permanent Google Sheet link is provided, use it automatically.
+    # If a permanent Google Sheet link is configured, load data automatically.
     if config.USE_PERMANENT_GOOGLE_SHEET_LINK:
         sheet_url = config.PERMANENT_GOOGLE_SHEET_LINK
-        st.info("Loading data from permanent Google Sheet link provided in configuration.")
+        st.info("Loading data from permanent Google Sheet...")
         try:
+            # Extract the sheet ID and build CSV URL.
             sheet_id = sheet_url.split("/d/")[1].split("/")[0]
             csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={config.DEFAULT_SHEET_NAME}"
             response = requests.get(csv_url)
             response.raise_for_status()
             df = pd.read_csv(StringIO(response.text), low_memory=False)
-            st.success("✅ Data loaded from permanent Google Sheet link.")
+            st.success("✅ Data loaded from permanent Google Sheet.")
+            logger.info("Data loaded from Google Sheet.")
         except Exception as e:
             st.error(f"🚨 Error loading Google Sheet: {e}")
             logger.error("Error loading permanent Google Sheet: %s", e)
@@ -130,27 +151,30 @@ def upload_data():
                     response = requests.get(csv_url)
                     response.raise_for_status()
                     df = pd.read_csv(StringIO(response.text), low_memory=False)
+                    logger.info("Data loaded from user-specified Google Sheet.")
                 except Exception as e:
                     st.error(f"🚨 Error loading Google Sheet: {e}")
-                    logger.error("Error loading Google Sheet: %s", e)
+                    logger.error("Error loading user-provided Google Sheet: %s", e)
+
     if df is not None and not df.empty:
         df = preprocess_data(df)
         st.session_state["data"] = df
-        # Apply global filters using filters.py
+        # Apply global filters via the filters module.
         filtered_df, _ = apply_filters(df)
         st.session_state["filtered_data"] = filtered_df
         st.success("✅ Data loaded and preprocessed successfully!")
-        logger.info("Data loaded.")
+        logger.info("Data preprocessed and filters applied.")
     else:
         st.info("No data loaded yet. Please upload or link a data source.")
     return df
 
 def reset_data():
-    """Remove data from session state and rerun the app."""
+    """Clear the loaded data and re-run the app."""
     if st.sidebar.button("Reset Data", key="reset_data"):
         st.session_state.pop("data", None)
         st.session_state.pop("filtered_data", None)
-        st.rerun()
+        logger.info("Data reset by user.")
+        st.experimental_rerun()
 
 def get_current_data():
     """Return filtered data if available; otherwise, return raw uploaded data."""
@@ -165,10 +189,17 @@ def display_footer():
     """
     st.markdown(footer_html, unsafe_allow_html=True)
 
+# -----------------------------------------------------------------------------
+# MAIN APPLICATION FUNCTION
+# -----------------------------------------------------------------------------
 def main():
-    st.set_page_config(page_title="Trade Data Dashboard", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(
+        page_title="Trade Data Dashboard", 
+        layout="wide", 
+        initial_sidebar_state="expanded"
+    )
     
-    # Authentication and Logout controls.
+    # Authentication & Logout controls.
     authenticate_user()
     logout_button()
     
@@ -191,7 +222,9 @@ def main():
     selected_page = st.sidebar.radio("Navigation", pages, index=0)
     st.session_state["page"] = selected_page
 
-    # Data upload and reset button on the Home page
+    # Allow data reset in the sidebar on every page.
+    reset_data()
+
     if selected_page == "Home":
         st.header("Executive Summary & Data Upload")
         df = upload_data()
