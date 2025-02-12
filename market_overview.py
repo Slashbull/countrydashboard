@@ -1,4 +1,3 @@
-# market_overview.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -111,7 +110,6 @@ def market_overview_dashboard(data: pd.DataFrame):
         if df["Year"].nunique() > 1:
             st.markdown("#### Trends by Year")
             yearly_trends = df.groupby(["Year", "Month"])["Tons"].sum().reset_index()
-            # Convert numeric month to abbreviated text if needed.
             def convert_month(m):
                 try:
                     m_int = int(m)
