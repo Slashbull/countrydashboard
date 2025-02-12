@@ -16,3 +16,4 @@ DEFAULT_SHEET_NAME = os.getenv("DEFAULT_SHEET_NAME", "data")
 # the app will use that link automatically.
 PERMANENT_GOOGLE_SHEET_LINK = os.getenv("PERMANENT_GOOGLE_SHEET_LINK", "https://docs.google.com/spreadsheets/d/1wPnhCLcwNwlOC-3YW3ku0SLwDz9vYghr-HgR6yEtWBk/edit?usp=sharing").strip()
 USE_PERMANENT_GOOGLE_SHEET_LINK = bool(PERMANENT_GOOGLE_SHEET_LINK)
+
