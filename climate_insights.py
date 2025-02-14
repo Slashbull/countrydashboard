@@ -2,41 +2,39 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
+import plotly.graph_objects as go
 
 # -------------------------------------------------------------------
-# Helper: Simulate historical climate data (rainfall in mm and temperature in °C)
-# for a given country from 2012 to the present (monthly frequency).
-# In practice, you would replace this with real climate data.
+# Helper function: Simulate monthly climate data for a specific region in Saudi Arabia.
+# You can replace this simulation with real data from an API or CSV.
 # -------------------------------------------------------------------
-def simulate_climate_data(country: str):
-    # Generate a date range from Jan 2012 to current month
-    start = datetime(2012, 1, 1)
-    end = datetime.today().replace(day=1)
-    periods = pd.date_range(start, end, freq='MS')
+def simulate_climate_data(region: str):
+    # Define the simulation parameters for each region.
+    # These parameters are illustrative; adjust the base values and noise as needed.
+    region_params = {
+        "Al-Qassim": {"rainfall_base": 15, "temp_base": 38},
+        "Al-Madinah": {"rainfall_base": 10, "temp_base": 40},
+        "Riyadh": {"rainfall_base": 12, "temp_base": 39},
+        "Eastern Province": {"rainfall_base": 20, "temp_base": 36},
+    }
+    if region not in region_params:
+        st.error(f"Region {region} not recognized.")
+        return pd.DataFrame()
+
+    params = region_params[region]
+    
+    # Create a monthly date range from January 2012 to current month.
+    start_date = datetime(2012, 1, 1)
+    end_date = datetime.today().replace(day=1)
+    periods = pd.date_range(start_date, end_date, freq="MS")
     n = len(periods)
     
-    # For simulation, assign different base conditions per country
-    # (These base values are illustrative.)
-    climate_params = {
-        "IRAQ": {"rainfall_base": 20, "temp_base": 35},
-        "UAE": {"rainfall_base": 15, "temp_base": 38},
-        "IRAN": {"rainfall_base": 25, "temp_base": 34},
-        "SAUDI ARABIA": {"rainfall_base": 10, "temp_base": 40},
-        "TUNISIA": {"rainfall_base": 50, "temp_base": 30},
-        "ALGERIA": {"rainfall_base": 45, "temp_base": 32},
-        "ISRAEL": {"rainfall_base": 60, "temp_base": 28},
-        "JORDAN": {"rainfall_base": 55, "temp_base": 29},
-        "STATE OF PALESTINE": {"rainfall_base": 60, "temp_base": 28},
-    }
-    # Use uppercase keys for matching
-    country_key = country.upper()
-    params = climate_params.get(country_key, {"rainfall_base": 40, "temp_base": 30})
-    
-    # Simulate monthly rainfall and temperature with some random noise
+    # Simulate monthly rainfall (in mm) and temperature (in °C) with some random noise.
+    # Rainfall is clipped to nonnegative values.
     np.random.seed(42)
-    rainfall = np.clip(np.random.normal(loc=params["rainfall_base"], scale=10, size=n), 0, None)
-    temperature = np.random.normal(loc=params["temp_base"], scale=3, size=n)
+    rainfall = np.clip(np.random.normal(loc=params["rainfall_base"], scale=5, size=n), 0, None)
+    temperature = np.random.normal(loc=params["temp_base"], scale=2, size=n)
     
     df = pd.DataFrame({
         "Period": periods,
@@ -47,94 +45,90 @@ def simulate_climate_data(country: str):
     return df
 
 # -------------------------------------------------------------------
-# Helper: Classify the crop outcome based on rainfall and temperature.
-# These rules are illustrative. Adjust thresholds and categories as needed.
+# Helper function: Classify crop outcome based on rainfall and temperature.
+# Adjust the thresholds as per expert knowledge about date cultivation.
 # -------------------------------------------------------------------
-def classify_crop_yield(rainfall, temperature):
-    # Example rules:
-    # - Excellent: Rainfall between 40 and 80 mm AND temperature between 25-32°C.
-    # - Very Good: Rainfall between 30 and 40 mm or 80-90 mm; temperature close to ideal.
-    # - Good: Rainfall between 20 and 30 mm or 90-100 mm; moderate temperatures.
-    # - Moderate: Rainfall slightly out of ideal range.
-    # - Poor: Very low rainfall (<20 mm) or very high (>100 mm), or extreme temperatures.
-    
-    if 40 <= rainfall <= 80 and 25 <= temperature <= 32:
+def classify_crop_outcome(row, ideal_rain_min, ideal_rain_max, ideal_temp_min, ideal_temp_max):
+    # Ideal conditions yield "Excellent" outcomes.
+    if ideal_rain_min <= row["Rainfall"] <= ideal_rain_max and ideal_temp_min <= row["Temperature"] <= ideal_temp_max:
         return "Excellent"
-    elif (30 <= rainfall < 40 or 80 < rainfall <= 90) and 24 <= temperature <= 33:
-        return "Very Good"
-    elif (20 <= rainfall < 30 or 90 < rainfall <= 100) and 23 <= temperature <= 34:
-        return "Good"
-    elif (rainfall < 20 or rainfall > 100) or (temperature < 20 or temperature > 36):
-        return "Poor"
+    # If conditions are moderately off, classify as "Good" or "Moderate"
+    elif (ideal_rain_min * 0.8 <= row["Rainfall"] < ideal_rain_min) or (ideal_rain_max < row["Rainfall"] <= ideal_rain_max * 1.2):
+        if ideal_temp_min - 2 <= row["Temperature"] <= ideal_temp_max + 2:
+            return "Good"
+        else:
+            return "Moderate"
+    # Extreme deviations yield "Poor"
     else:
-        return "Moderate"
+        return "Poor"
 
 # -------------------------------------------------------------------
-# Main Dashboard Function for Climate Insights (Date Crop Review)
+# Main Dashboard Function for Climate Insights (Saudi Arabia – Date Crop Review)
 # -------------------------------------------------------------------
 def yearly_crop_review_dashboard(data: pd.DataFrame):
-    st.title("🌦 Advanced Climate & Crop Review for Date Cultivation")
+    st.title("🌦 Saudi Arabia Date Crop Climate Insights")
     st.markdown("""
-    This dashboard estimates date crop performance based on simulated climate conditions (rainfall and temperature) 
-    for key partner countries where dates are grown. Adjust the parameters to see how conditions over time may affect 
-    crop quality.
+    This dashboard reviews simulated climate conditions (rainfall and temperature) for key date‐growing regions in Saudi Arabia.  
+    Select a region to see monthly climate trends, review yearly crop outcome summaries, and download the climate data.
     """)
-    
-    # Allow user to select the partner country of interest.
-    partners = ["Iraq", "UAE", "Iran", "Saudi Arabia", "Tunisia", "Algeria", "Israel", "Jordan", "State of Palestine"]
-    selected_country = st.selectbox("Select Country (Partner):", partners)
-    
-    # Get simulated climate data for the selected country.
-    climate_df = simulate_climate_data(selected_country)
-    
-    # Let user optionally adjust ideal thresholds via sidebar.
-    st.sidebar.header("Adjust Ideal Conditions")
-    ideal_rainfall_min = st.sidebar.number_input("Ideal Rainfall Min (mm)", value=40.0, step=1.0)
-    ideal_rainfall_max = st.sidebar.number_input("Ideal Rainfall Max (mm)", value=80.0, step=1.0)
-    ideal_temp_min = st.sidebar.number_input("Ideal Temperature Min (°C)", value=25.0, step=0.5)
-    ideal_temp_max = st.sidebar.number_input("Ideal Temperature Max (°C)", value=32.0, step=0.5)
-    
-    # Classify crop outcome for each month based on the ideal thresholds.
+
+    # Let the user select the region of interest.
+    regions = ["Al-Qassim", "Al-Madinah", "Riyadh", "Eastern Province"]
+    selected_region = st.selectbox("Select Region:", regions)
+
+    # Load (simulate) the climate data for the selected region.
+    climate_df = simulate_climate_data(selected_region)
+    if climate_df.empty:
+        st.error("No climate data available.")
+        return
+
+    # Sidebar: Allow adjustment of ideal thresholds for an "ideal" crop outcome.
+    st.sidebar.header("Ideal Climate Conditions")
+    ideal_rain_min = st.sidebar.number_input("Ideal Rainfall Minimum (mm)", value=15.0, step=0.5)
+    ideal_rain_max = st.sidebar.number_input("Ideal Rainfall Maximum (mm)", value=25.0, step=0.5)
+    ideal_temp_min = st.sidebar.number_input("Ideal Temperature Minimum (°C)", value=35.0, step=0.5)
+    ideal_temp_max = st.sidebar.number_input("Ideal Temperature Maximum (°C)", value=40.0, step=0.5)
+
+    # Classify crop outcome for each month using the provided thresholds.
     climate_df["Crop Outcome"] = climate_df.apply(
-        lambda row: (
-            "Excellent" if ideal_rainfall_min <= row["Rainfall"] <= ideal_rainfall_max and ideal_temp_min <= row["Temperature"] <= ideal_temp_max
-            else "Poor" if row["Rainfall"] < ideal_rainfall_min or row["Rainfall"] > (ideal_rainfall_max + 20) or row["Temperature"] < (ideal_temp_min - 3) or row["Temperature"] > (ideal_temp_max + 3)
-            else "Moderate"
-        ), axis=1
+        lambda row: classify_crop_outcome(row, ideal_rain_min, ideal_rain_max, ideal_temp_min, ideal_temp_max),
+        axis=1
     )
-    
-    # Summary by Year: average rainfall, temperature, and dominant crop outcome.
+
+    # Create a Year column for aggregation.
     climate_df["Year"] = climate_df["Period"].dt.year
+
+    # Generate a yearly summary: average rainfall, average temperature, and most frequent crop outcome.
     yearly_summary = climate_df.groupby("Year").agg({
         "Rainfall": "mean",
         "Temperature": "mean",
-        "Crop Outcome": lambda x: x.mode()[0] if not x.mode().empty else "N/A"
+        "Crop Outcome": lambda outcomes: outcomes.mode()[0] if not outcomes.mode().empty else "N/A"
     }).reset_index()
     yearly_summary.rename(columns={
         "Rainfall": "Avg Rainfall (mm)",
         "Temperature": "Avg Temp (°C)",
         "Crop Outcome": "Dominant Outcome"
     }, inplace=True)
-    
-    # Multi-tab layout
+
+    # Multi-tab layout for the module.
     tabs = st.tabs(["Overview", "Monthly Trends", "Yearly Review", "Download Data"])
-    
+
     #########################################################
     # Tab 1: Overview – Automated Insights and Data Table
     #########################################################
     with tabs[0]:
-        st.header(f"Climate Overview for {selected_country}")
+        st.header(f"Climate Overview for {selected_region}")
         st.markdown("#### Automated Insights")
         insights = []
         for year in sorted(yearly_summary["Year"].unique()):
             row = yearly_summary[yearly_summary["Year"] == year].iloc[0]
-            insights.append(f"**{year}**: Avg Rainfall = {row['Avg Rainfall (mm)']:.1f} mm, Avg Temp = {row['Avg Temp (°C)']:.1f}°C, Crop Outcome: **{row['Dominant Outcome']}**.")
+            insights.append(f"**{year}**: Avg Rainfall = {row['Avg Rainfall (mm)']:.1f} mm, Avg Temp = {row['Avg Temp (°C)']:.1f}°C, Dominant Crop Outcome: **{row['Dominant Outcome']}**.")
         st.markdown("\n\n".join(insights))
-        st.markdown("#### Detailed Climate Data")
+        st.markdown("#### Detailed Monthly Climate Data")
         st.dataframe(climate_df[["Period_str", "Rainfall", "Temperature", "Crop Outcome"]])
-    
+
     #########################################################
-    # Tab 2: Monthly Trends – Line Charts
+    # Tab 2: Monthly Trends – Line Charts for Rainfall and Temperature
     #########################################################
     with tabs[1]:
         st.header("Monthly Climate Trends")
@@ -142,17 +136,26 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         fig_temp = px.line(climate_df, x="Period_str", y="Temperature", title="Monthly Temperature Trend (°C)", markers=True, template="plotly_white")
         st.plotly_chart(fig_rain, use_container_width=True)
         st.plotly_chart(fig_temp, use_container_width=True)
-    
+
     #########################################################
-    # Tab 3: Yearly Review – Grouped Bar Chart by Year and Outcome
+    # Tab 3: Yearly Review – Stacked Bar Chart of Crop Outcomes by Year
     #########################################################
     with tabs[2]:
         st.header("Yearly Crop Outcome Review")
         outcome_year = climate_df.groupby(["Year", "Crop Outcome"]).size().reset_index(name="Count")
-        fig_outcome = px.bar(outcome_year, x="Year", y="Count", color="Crop Outcome",
-                             title="Yearly Distribution of Crop Outcomes", barmode="stack", template="plotly_white")
+        fig_outcome = px.bar(
+            outcome_year, 
+            x="Year", 
+            y="Count", 
+            color="Crop Outcome",
+            title="Yearly Distribution of Crop Outcomes",
+            barmode="stack",
+            template="plotly_white"
+        )
         st.plotly_chart(fig_outcome, use_container_width=True)
-    
+        st.markdown("#### Yearly Climate Summary Table")
+        st.dataframe(yearly_summary)
+
     #########################################################
     # Tab 4: Download Data
     #########################################################
@@ -160,20 +163,9 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         st.header("Download Climate Data")
         csv_data = climate_df.to_csv(index=False).encode("utf-8")
         st.download_button("Download as CSV", csv_data, "climate_data.csv", "text/csv")
-    
-    st.success("✅ Climate Insights Dashboard loaded successfully!")
 
-# For testing standalone, uncomment the following:
+    st.success("✅ Saudi Arabia Climate Insights Dashboard loaded successfully!")
+
+# For standalone testing uncomment below:
 # if __name__ == "__main__":
-#     # Simulate a minimal DataFrame (your main data should already be preprocessed)
-#     dummy_df = pd.DataFrame({
-#         "Year": [2012]*5,
-#         "Month": [1, 2, 3, 4, 5],
-#         "Reporter": ["India"]*5,
-#         "Flow": ["Import"]*5,
-#         "Partner": ["Iraq", "UAE", "Iran", "Saudi Arabia", "Tunisia"],
-#         "Code": [804]*5,
-#         "Desc": ["Dates"]*5,
-#         "Tons": [100, 200, 150, 250, 300]
-#     })
-#     yearly_crop_review_dashboard(dummy_df)
+#     yearly_crop_review_dashboard(pd.DataFrame())  # Replace with actual data if testing.
