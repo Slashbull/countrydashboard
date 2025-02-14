@@ -11,7 +11,7 @@ PASSWORD = os.getenv("APP_PASSWORD", "admin123")
 
 # Data source settings
 DEFAULT_SHEET_NAME = os.getenv("DEFAULT_SHEET_NAME", "data")
-PERMANENT_GOOGLE_SHEET_LINK = os.getenv("PERMANENT_GOOGLE_SHEET_LINK", "").strip()
+PERMANENT_GOOGLE_SHEET_LINK = os.getenv("PERMANENT_GOOGLE_SHEET_LINK", "https://docs.google.com/spreadsheets/d/1wPnhCLcwNwlOC-3YW3ku0SLwDz9vYghr-HgR6yEtWBk/edit?usp=sharing").strip()
 USE_PERMANENT_GOOGLE_SHEET_LINK = bool(PERMANENT_GOOGLE_SHEET_LINK)
 
 # Performance & caching settings
