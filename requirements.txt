@@ -9,3 +9,4 @@ scipy
 statsmodels
 scikit-learn
 rapidfuzz
+prophet
