@@ -54,21 +54,33 @@ def time_series_decomposition_dashboard(data: pd.DataFrame):
         st.error(e)
         return
 
+    # Reset index and rename columns for Trend.
+    trend_df = result.trend.reset_index().rename(columns={"index": "Period_dt", 0: "Tons"})
+    # Sometimes, the Series doesn't have a column 0, so we rename based on the Series name if exists.
+    if "Tons" not in trend_df.columns:
+        trend_df = trend_df.rename(columns={trend_df.columns[1]: "Tons"})
+
     # Plot Trend Component.
     st.subheader("Trend Component")
-    fig_trend = px.line(result.trend.reset_index(), x="Period_dt", y="Tons", title="Trend Component")
+    fig_trend = px.line(trend_df, x="Period_dt", y="Tons", title="Trend Component", template="plotly_white")
     fig_trend.update_layout(xaxis_title="Period", yaxis_title="Volume (Tons)")
     st.plotly_chart(fig_trend, use_container_width=True)
 
-    # Plot Seasonal Component.
+    # Reset index and rename columns for Seasonal.
+    seasonal_df = result.seasonal.reset_index().rename(columns={"index": "Period_dt", 0: "Tons"})
+    if "Tons" not in seasonal_df.columns:
+        seasonal_df = seasonal_df.rename(columns={seasonal_df.columns[1]: "Tons"})
     st.subheader("Seasonal Component")
-    fig_seasonal = px.line(result.seasonal.reset_index(), x="Period_dt", y="Tons", title="Seasonal Component")
+    fig_seasonal = px.line(seasonal_df, x="Period_dt", y="Tons", title="Seasonal Component", template="plotly_white")
     fig_seasonal.update_layout(xaxis_title="Period", yaxis_title="Volume (Tons)")
     st.plotly_chart(fig_seasonal, use_container_width=True)
 
-    # Plot Residual Component.
+    # Reset index and rename columns for Residual.
+    resid_df = result.resid.reset_index().rename(columns={"index": "Period_dt", 0: "Tons"})
+    if "Tons" not in resid_df.columns:
+        resid_df = resid_df.rename(columns={resid_df.columns[1]: "Tons"})
     st.subheader("Residual Component")
-    fig_resid = px.line(result.resid.reset_index(), x="Period_dt", y="Tons", title="Residual Component")
+    fig_resid = px.line(resid_df, x="Period_dt", y="Tons", title="Residual Component", template="plotly_white")
     fig_resid.update_layout(xaxis_title="Period", yaxis_title="Volume (Tons)")
     st.plotly_chart(fig_resid, use_container_width=True)
 
