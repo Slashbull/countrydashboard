@@ -7,11 +7,8 @@ TradeDataDashboard/
 ├── ai_based_alerts.py
 ├── forecasting.py
 ├── country_level_insights.py
-├── segmentation_analysis.py
-├── correlation_analysis.py
 ├── time_series_decomposition.py
 ├── calendar_insights.py
 ├── climate_insights.py
-├── scenario_simulation.py      # Optional module for “what if” simulations
 ├── reporting.py                # Optional module for exports/reports
 └── requirements.txt
