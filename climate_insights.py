@@ -5,20 +5,44 @@ import plotly.express as px
 import requests
 
 def climate_insights_dashboard():
-    st.title("🌦 Climate Insights Dashboard")
+    st.title("🌦 Climate Insights for Date-Growing Regions")
     st.markdown("""
-    This dashboard fetches a 7‑day weather forecast using the free Open‑Meteo API.  
-    Enter the latitude and longitude to view the forecast for that location.
+    This dashboard fetches a 7‑day weather forecast for the key date‑growing regions in select partner countries.  
+    Select a partner country below to view its weather forecast.  
+    *Data is fetched using the free Open‑Meteo API.*
     """)
 
-    # Input for location (default set to New Delhi, India)
-    latitude = st.number_input("Enter Latitude", value=28.6139, format="%.4f")
-    longitude = st.number_input("Enter Longitude", value=77.2090, format="%.4f")
+    # Mapping of partner countries to approximate coordinates for key date-growing regions.
+    # Based on:
+    # Iraq – Basra; UAE – Al Ain; Iran – Khuzestan; Saudi Arabia – Eastern Province/Al-Ahsa; 
+    # Tunisia – Gabes; Algeria – Biskra; Israel – Jordan Valley; Jordan – Near the Dead Sea; 
+    # State of Palestine – Jericho region.
+    partner_coords = {
+        "IRAQ": {"lat": 30.5, "lon": 47.8},
+        "UNITED ARAB EMIRATES": {"lat": 24.22, "lon": 55.75},
+        "IRAN": {"lat": 31.3, "lon": 48.7},
+        "SAUDI ARABIA": {"lat": 25.3, "lon": 49.5},
+        "TUNISIA": {"lat": 33.9, "lon": 10.1},
+        "ALGERIA": {"lat": 34.85, "lon": 5.73},
+        "ISRAEL": {"lat": 31.5, "lon": 35.0},
+        "JORDAN": {"lat": 31.6, "lon": 35.5},
+        "STATE OF PALESTINE": {"lat": 31.9, "lon": 35.2}
+    }
 
-    # Build API request URL for a 7-day forecast including max/min temperature and precipitation.
+    partner_list = list(partner_coords.keys())
+    selected_partner = st.selectbox("Select a Partner Country:", partner_list)
+
+    coords = partner_coords.get(selected_partner)
+    if not coords:
+        st.error("Coordinates not found for the selected partner.")
+        return
+
+    st.markdown(f"**Fetching climate data for {selected_partner} (lat: {coords['lat']}, lon: {coords['lon']})**")
+
+    # Build API URL for a 7‑day forecast (daily max/min temperature and precipitation) using Open‑Meteo.
     url = (
         f"https://api.open-meteo.com/v1/forecast?"
-        f"latitude={latitude}&longitude={longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum"
+        f"latitude={coords['lat']}&longitude={coords['lon']}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum"
         f"&timezone=auto"
     )
     st.info("Fetching 7‑day forecast data...")
@@ -35,10 +59,10 @@ def climate_insights_dashboard():
 
     # Create a DataFrame from the API response.
     df = pd.DataFrame({
-        "Date": daily["time"],
-        "Max Temperature (°C)": daily["temperature_2m_max"],
-        "Min Temperature (°C)": daily["temperature_2m_min"],
-        "Precipitation (mm)": daily["precipitation_sum"]
+        "Date": daily.get("time", []),
+        "Max Temperature (°C)": daily.get("temperature_2m_max", []),
+        "Min Temperature (°C)": daily.get("temperature_2m_min", []),
+        "Precipitation (mm)": daily.get("precipitation_sum", [])
     })
 
     st.markdown("### 7‑Day Weather Forecast")
