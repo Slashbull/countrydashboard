@@ -4,29 +4,26 @@ import pandas as pd
 import plotly.express as px
 import requests
 
-def climate_insights_dashboard():
+def climate_insights_dashboard(_data=None):
     st.title("🌦 Climate Insights for Date-Growing Regions")
     st.markdown("""
     This dashboard fetches a 7‑day weather forecast for the key date‑growing regions in select partner countries.  
-    Select a partner country below to view its weather forecast.  
+    Select a partner country below to view its 7‑day forecast.  
     *Data is fetched using the free Open‑Meteo API.*
     """)
 
-    # Mapping of partner countries to approximate coordinates for key date-growing regions.
-    # Based on:
-    # Iraq – Basra; UAE – Al Ain; Iran – Khuzestan; Saudi Arabia – Eastern Province/Al-Ahsa; 
-    # Tunisia – Gabes; Algeria – Biskra; Israel – Jordan Valley; Jordan – Near the Dead Sea; 
-    # State of Palestine – Jericho region.
+    # Mapping of partner countries to approximate coordinates for the date‑growing regions.
+    # Coordinates are based on key regions where dates are grown.
     partner_coords = {
-        "IRAQ": {"lat": 30.5, "lon": 47.8},
-        "UNITED ARAB EMIRATES": {"lat": 24.22, "lon": 55.75},
-        "IRAN": {"lat": 31.3, "lon": 48.7},
-        "SAUDI ARABIA": {"lat": 25.3, "lon": 49.5},
-        "TUNISIA": {"lat": 33.9, "lon": 10.1},
-        "ALGERIA": {"lat": 34.85, "lon": 5.73},
-        "ISRAEL": {"lat": 31.5, "lon": 35.0},
-        "JORDAN": {"lat": 31.6, "lon": 35.5},
-        "STATE OF PALESTINE": {"lat": 31.9, "lon": 35.2}
+        "IRAQ": {"lat": 30.5, "lon": 47.8},                # Basra region
+        "UNITED ARAB EMIRATES": {"lat": 24.22, "lon": 55.75},# Al Ain region
+        "IRAN": {"lat": 31.3, "lon": 48.7},                  # Khuzestan region
+        "SAUDI ARABIA": {"lat": 25.3, "lon": 49.5},          # Eastern Province/Al-Ahsa
+        "TUNISIA": {"lat": 33.9, "lon": 10.1},               # Gabes region
+        "ALGERIA": {"lat": 34.85, "lon": 5.73},              # Biskra region
+        "ISRAEL": {"lat": 31.5, "lon": 35.0},                # Jordan Valley/Negev
+        "JORDAN": {"lat": 31.6, "lon": 35.5},                # Near the Dead Sea
+        "STATE OF PALESTINE": {"lat": 31.9, "lon": 35.2}     # Jericho region
     }
 
     partner_list = list(partner_coords.keys())
