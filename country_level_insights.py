@@ -2,7 +2,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
 from sklearn.cluster import KMeans
 
 # Helper function for clustering with safety checks.
@@ -16,7 +15,6 @@ def apply_clustering(data: pd.DataFrame, n_clusters=3):
         return data
     try:
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        # Ensure there are no missing values.
         if data["Tons"].isnull().any():
             data = data.dropna(subset=["Tons"])
         data["cluster"] = kmeans.fit_predict(data[["Tons"]])
@@ -30,7 +28,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     st.markdown("""
     Explore trade volume aggregated by a chosen dimension.
     
-    Use the tabs below to view an overview, trend analysis, geographic distribution, and to download the aggregated data.
+    Use the tabs below to view an overview, trend analysis, geographic distribution, and download the aggregated data.
     """)
 
     # Allow user to choose the dimension for aggregation.
@@ -47,11 +45,11 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     agg_data = agg_data.sort_values("Tons", ascending=False)
     total_volume = agg_data["Tons"].sum()
 
-    # Apply clustering (with safe check).
+    # Apply clustering (for additional insights in charts).
     agg_data = apply_clustering(agg_data)
 
     # --- ISO Mapping for Geographic Distribution ---
-    # Use separate mappings for Reporter and Partner.
+    # For Reporter dimension, use a default mapping.
     if dimension == "Reporter":
         iso_mapping = {
             "INDIA": "IND",
@@ -64,10 +62,10 @@ def country_level_insights_dashboard(data: pd.DataFrame):
             "CANADA": "CAN"
             # Extend as needed.
         }
-    else:  # For Partner, using provided values.
+    else:  # For Partner dimension.
         iso_mapping = {
             "IRAQ": "IRQ",
-            "UAE": "ARE",
+            "UNITED ARAB EMIRATES": "ARE",
             "IRAN": "IRN",
             "SAUDI ARABIA": "SAU",
             "TUNISIA": "TUN",
@@ -76,7 +74,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
             "JORDAN": "JOR",
             "STATE OF PALESTINE": "PSE"
         }
-    # Convert names to uppercase and map.
+    # Convert names to uppercase for consistent mapping.
     agg_data["iso_alpha"] = agg_data[dimension].str.upper().map(iso_mapping)
 
     # Create a multi-tab layout.
