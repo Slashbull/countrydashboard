@@ -34,7 +34,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     st.markdown("""
     Explore trade volume aggregated by a chosen dimension.
     
-    Use the tabs below to view an overview, trend analysis, and download the aggregated data.
+    Use the tabs below to view an overview, detailed trend analysis, and download the aggregated data.
     """)
 
     # Allow user to choose the dimension for aggregation.
@@ -54,7 +54,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     # Apply clustering.
     agg_data = apply_clustering(agg_data)
 
-    # (Optional) ISO mapping remains in the code for future expansion.
+    # ISO mapping (used for potential future geographic features)
     if dimension == "Reporter":
         iso_mapping = {
             "INDIA": "IND",
@@ -81,7 +81,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
         }
     agg_data["iso_alpha"] = agg_data[dimension].str.upper().map(iso_mapping)
 
-    # Create a multi-tab layout (Overview, Trend Analysis, Download Data).
+    # Create a multi-tab layout.
     tabs = st.tabs(["Overview", "Trend Analysis", "Download Data"])
     
     #########################################################
@@ -158,7 +158,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
                 if yearly_by_month.empty:
                     st.info("No data available for Yearly Trend by Month.")
                 else:
-                    # Multi-line chart: x-axis = Year, one line per Month.
+                    # Multi-line chart: x-axis = Year, with one line per Month.
                     fig_yearly = px.line(
                         yearly_by_month,
                         x="Year",
