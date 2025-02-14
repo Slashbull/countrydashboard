@@ -114,7 +114,10 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     'Period' column from 'Month' and 'Year'. Supports both numeric and abbreviated month values.
     """
     if "Tons" in df.columns:
-        df["Tons"] = pd.to_numeric(df["Tons"].astype(str).str.replace(",", "", regex=False), errors="coerce")
+        df["Tons"] = pd.to_numeric(
+            df["Tons"].astype(str).str.replace(",", "", regex=False),
+            errors="coerce"
+        )
     if "Year" in df.columns and "Month" in df.columns:
         try:
             def parse_period(row):
@@ -201,11 +204,11 @@ def reset_data():
 def reset_filters():
     """
     Clear all filter selections stored in session_state.
-    This function deletes all keys starting with "multiselect_".
+    Instead of deleting keys, we set them to an empty list.
     """
-    filter_keys = [key for key in st.session_state.keys() if key.startswith("multiselect_")]
-    for key in filter_keys:
-        del st.session_state[key]
+    for key in list(st.session_state.keys()):
+        if key.startswith("multiselect_"):
+            st.session_state[key] = []
     logger.info("Filters reset by user.")
     st.rerun()
 
@@ -272,7 +275,7 @@ def main():
             st.info(f"Data Last Updated: {last_updated}")
     st.session_state["page"] = selected_page
 
-    # Always show the reset data button.
+    # Data reset button always available in sidebar.
     reset_data()
 
     if selected_page == "Home":
