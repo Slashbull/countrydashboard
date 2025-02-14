@@ -213,7 +213,7 @@ def main():
             elif selected_page == "Calendar Insights":
                 calendar_insights_dashboard(filtered_df)
             elif selected_page == "Climate Insights":
-                climate_insights_dashboard(filtered_df)
+                date_crop_analysis_dashboard(filtered_df)
             elif selected_page == "Scenario Simulation":
                 scenario_simulation_dashboard(filtered_df)
             elif selected_page == "Reporting":
