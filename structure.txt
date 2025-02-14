@@ -8,7 +8,5 @@ TradeDataDashboard/
 ├── forecasting.py
 ├── country_level_insights.py
 ├── time_series_decomposition.py
-├── calendar_insights.py
-├── climate_insights.py
-├── reporting.py                # Optional module for exports/reports
+├── reporting.py
 └── requirements.txt
