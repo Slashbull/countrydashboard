@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from prophet import Prophet
+import requests
 from datetime import datetime
 
 # -----------------------------------
@@ -11,10 +12,8 @@ from datetime import datetime
 # -----------------------------------
 def simulate_historical_climate(start_year=2012, end_year=None, country="IRAQ"):
     """
-    Simulate monthly average climate data (avg daily precipitation in mm/day and avg maximum temperature in °C)
+    Simulate monthly average climate data (average daily precipitation in mm/day and average maximum temperature in °C)
     from start_year to the current year for a given country.
-    
-    These base values are approximate for key date-growing regions.
     """
     if end_year is None:
         end_year = datetime.now().year
@@ -46,14 +45,14 @@ def simulate_historical_climate(start_year=2012, end_year=None, country="IRAQ"):
     base_p = base_precip.get(country.upper(), 0.65)
     base_t = base_temp.get(country.upper(), 42)
     
-    # Simulate some seasonal variation: use a sine wave to mimic seasonal patterns.
+    # Simulate seasonal variation using a sine wave.
     months = np.array([d.month for d in dates])
     seasonal_factor = np.sin(2 * np.pi * (months-1)/12)
     
-    # Generate precipitation: add random noise.
+    # Simulate precipitation: add seasonal variation and random noise.
     precip = [max(0, base_p + 0.1 * seasonal_factor[i] + np.random.normal(0, 0.05))
               for i in range(len(dates))]
-    # Generate temperature: assume higher in summer, lower in winter.
+    # Simulate temperature: higher in summer, lower in winter.
     temp = [base_t + 2 * seasonal_factor[i] + np.random.normal(0, 1)
             for i in range(len(dates))]
     
@@ -69,26 +68,24 @@ def simulate_historical_climate(start_year=2012, end_year=None, country="IRAQ"):
 # -----------------------------------
 def assess_crop_quality(avg_precip, avg_max_temp):
     """
-    Compute crop quality score based on average daily precipitation and average max temperature.
-    Ideal conditions for date palms are:
-      - Low precipitation: less than ~0.5 mm/day is ideal.
-      - High maximum temperature in an optimal range (e.g., 38-42°C).
+    Assess date crop quality based on average daily precipitation and average maximum temperature.
+    
+    Precipitation thresholds (mm/day):
+      - < 0.5  -> Score 5
+      - 0.5-0.7 -> Score 4
+      - 0.7-0.9 -> Score 3
+      - 0.9-1.1 -> Score 2
+      - >= 1.1  -> Score 1
       
-    Precipitation Score:
-      - < 0.5 mm/day: 5
-      - 0.5-0.7: 4
-      - 0.7-0.9: 3
-      - 0.9-1.1: 2
-      - >= 1.1: 1
-      
-    Temperature Score:
-      - 38-42°C: 5
-      - 36-38 or 42-44°C: 4
-      - 34-36 or 44-46°C: 3
-      - 32-34 or 46-48°C: 2
-      - Otherwise: 1
+    Temperature thresholds (°C):
+      - 38-42: Score 5
+      - 36-38 or 42-44: Score 4
+      - 34-36 or 44-46: Score 3
+      - 32-34 or 46-48: Score 2
+      - Otherwise: Score 1
       
     Overall Score = 0.6 * (Precipitation Score) + 0.4 * (Temperature Score)
+    
     Final Rating:
       - >= 4.5: EXCELLENT
       - >= 4: VERY GOOD
@@ -134,12 +131,9 @@ def assess_crop_quality(avg_precip, avg_max_temp):
     return rating, overall_score
 
 # -----------------------------------
-# Helper: Forecast Future Climate Trend using Prophet (on precipitation)
+# Helper: Forecast Future Climate Trend (Precipitation) using Prophet
 # -----------------------------------
 def forecast_climate(hist_df, periods=12):
-    """
-    Use Prophet to forecast monthly average precipitation.
-    """
     from prophet import Prophet
     df_prophet = hist_df.rename(columns={"Date": "ds", "Avg Precipitation (mm/day)": "y"})
     model = Prophet(yearly_seasonality=True, daily_seasonality=False)
@@ -151,20 +145,22 @@ def forecast_climate(hist_df, periods=12):
 # -----------------------------------
 # Main Dashboard Function
 # -----------------------------------
-def climate_insights_dashboard():
-    st.title("🌦 Historical & Forecast Climate Insights for Date Crop Analysis")
+def date_crop_analysis_dashboard(data=None):
+    """
+    The data parameter is ignored in this module; climate data is fetched/simulated internally.
+    """
+    st.title("🌴 Date Crop Quality Analysis Dashboard")
     st.markdown("""
-    This dashboard simulates historical monthly climate data (2012–present) for key date‑growing regions and uses it to:
-    - Visualize historical trends in precipitation and temperature.
-    - Forecast future precipitation trends.
-    - Assess the expected quality of the date crop based on climate conditions.
+    **Overview:**  
+    This dashboard analyzes historical monthly climate data (2012–present) for key date‑growing regions and forecasts future climate trends.  
+    It then assesses the expected quality of date crops based on key climate factors:
+    - **Precipitation:** Date palms thrive in low rainfall; too much rainfall can reduce yield.
+    - **Temperature:** Optimal high temperatures (but not excessive) support date growth.
     
-    **Key Factors:**
-    - Date palms thrive in hot, arid climates with very low rainfall.
-    - Excessive rainfall or suboptimal temperatures can harm crop quality.
+    The crop quality is rated as **EXCELLENT, VERY GOOD, GOOD, MODERATE,** or **BAD**.
     """)
 
-    # Let the user select a partner country (date-growing region)
+    # Let the user select a partner country.
     partner_options = ["IRAQ", "UNITED ARAB EMIRATES", "IRAN", "SAUDI ARABIA", "TUNISIA", "ALGERIA", "ISRAEL", "JORDAN", "STATE OF PALESTINE"]
     selected_country = st.selectbox("Select a Date-Growing Country:", partner_options)
 
@@ -173,7 +169,7 @@ def climate_insights_dashboard():
     st.markdown("### Historical Monthly Climate Data (Simulated)")
     st.dataframe(hist_df)
 
-    # Display historical trends.
+    # Visualize historical trends.
     fig_precip = px.line(
         hist_df,
         x="Date",
@@ -199,7 +195,6 @@ def climate_insights_dashboard():
     # Compute overall historical averages.
     overall_avg_precip = hist_df["Avg Precipitation (mm/day)"].mean()
     overall_avg_temp = hist_df["Avg Max Temperature (°C)"].mean()
-
     st.markdown(f"**Overall Historical Average Daily Precipitation:** {overall_avg_precip:.2f} mm/day")
     st.markdown(f"**Overall Historical Average Max Temperature:** {overall_avg_temp:.2f} °C")
 
@@ -207,7 +202,6 @@ def climate_insights_dashboard():
     historical_quality, historical_score = assess_crop_quality(overall_avg_precip, overall_avg_temp)
     st.markdown(f"**Historical Crop Quality Rating:** {historical_quality} (Score: {historical_score:.2f})")
 
-    # Forecast future precipitation trends.
     st.markdown("---")
     st.header("Forecast Future Climate Trend (Precipitation)")
     forecast_df, model = forecast_climate(hist_df, periods=12)
@@ -218,15 +212,12 @@ def climate_insights_dashboard():
     fig_forecast = model.plot(forecast_df)
     st.pyplot(fig_forecast)
 
-    # Use the forecasted average precipitation to predict crop quality.
-    # Here we use the forecasted precipitation for the next month as a proxy.
+    # Use forecasted precipitation and historical temperature (assumed constant) to predict crop quality.
     if not forecast_future.empty:
         forecast_avg_precip = forecast_future["yhat"].iloc[0]
     else:
         forecast_avg_precip = overall_avg_precip
-
-    # For temperature forecasting, we might assume similar temperature patterns as historical average.
-    forecast_avg_temp = overall_avg_temp
+    forecast_avg_temp = overall_avg_temp  # Assuming similar temperature patterns.
 
     predicted_quality, predicted_score = assess_crop_quality(forecast_avg_precip, forecast_avg_temp)
     st.markdown("---")
@@ -235,7 +226,7 @@ def climate_insights_dashboard():
     st.markdown(f"**Assumed Average Max Temperature:** {forecast_avg_temp:.2f} °C")
     st.markdown(f"**Predicted Date Crop Quality for Next Month:** {predicted_quality} (Score: {predicted_score:.2f})")
 
-    # Alert if predicted quality is below a user-defined threshold.
+    # Alert: Allow user to set a minimum acceptable quality threshold.
     quality_levels = {"EXCELLENT": 5, "VERY GOOD": 4, "GOOD": 3, "MODERATE": 2, "BAD": 1}
     default_threshold = 3  # e.g., GOOD or above is acceptable.
     threshold_level = st.slider("Set Minimum Acceptable Crop Quality Level (1=BAD, 5=EXCELLENT)", min_value=1, max_value=5, value=default_threshold, step=1)
@@ -248,4 +239,4 @@ def climate_insights_dashboard():
     st.success("✅ Date Crop Analysis Dashboard loaded successfully!")
 
 if __name__ == "__main__":
-    climate_insights_dashboard()
+    date_crop_analysis_dashboard()
