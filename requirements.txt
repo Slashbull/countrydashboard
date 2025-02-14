@@ -11,3 +11,4 @@ scikit-learn
 rapidfuzz
 prophet
 networkx
+tabulate
