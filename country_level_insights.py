@@ -34,7 +34,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     st.markdown("""
     Explore trade volume aggregated by a chosen dimension.
     
-    Use the tabs below to view an overview, trend analysis, geographic distribution, and download the aggregated data.
+    Use the tabs below to view an overview, trend analysis, and download the aggregated data.
     """)
 
     # Allow user to choose the dimension for aggregation.
@@ -54,7 +54,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     # Apply clustering.
     agg_data = apply_clustering(agg_data)
 
-    # --- ISO Mapping for Geographic Distribution ---
+    # (Optional) ISO mapping remains in the code for future expansion.
     if dimension == "Reporter":
         iso_mapping = {
             "INDIA": "IND",
@@ -65,9 +65,8 @@ def country_level_insights_dashboard(data: pd.DataFrame):
             "UNITED KINGDOM": "GBR",
             "FRANCE": "FRA",
             "CANADA": "CAN"
-            # Extend as needed.
         }
-    else:  # For Partner dimension.
+    else:
         iso_mapping = {
             "IRAQ": "IRQ",
             "UAE": "ARE",
@@ -82,8 +81,8 @@ def country_level_insights_dashboard(data: pd.DataFrame):
         }
     agg_data["iso_alpha"] = agg_data[dimension].str.upper().map(iso_mapping)
 
-    # Create a multi-tab layout.
-    tabs = st.tabs(["Overview", "Trend Analysis", "Geographic Distribution", "Download Data"])
+    # Create a multi-tab layout (Overview, Trend Analysis, Download Data).
+    tabs = st.tabs(["Overview", "Trend Analysis", "Download Data"])
     
     #########################################################
     # Tab 1: Overview – Aggregated Data & Visualizations
@@ -127,20 +126,20 @@ def country_level_insights_dashboard(data: pd.DataFrame):
         if "Period" not in data.columns or "Year" not in data.columns:
             st.info("Both 'Period' and 'Year' columns are required for detailed trend analysis.")
         else:
-            # Ensure Month abbreviation is extracted.
+            # Create a new column "Month_Abbr" from the Period column (assumed format "Jan-2012").
             if "Month_Abbr" not in data.columns:
                 data["Month_Abbr"] = data["Period"].apply(lambda x: x.split("-")[0])
             # Order the Month_Abbr.
             data["Month_Abbr"] = pd.Categorical(data["Month_Abbr"], categories=list(MONTH_ORDER.keys()), ordered=True)
 
-            # Let the user select an entity for trend analysis.
+            # Let the user select an entity.
             selected_entity = st.selectbox(f"Select a {dimension} for Trend Analysis:", agg_data[dimension].unique())
             entity_data = data[data[dimension] == selected_entity]
             if entity_data.empty:
                 st.info(f"No trend data available for {selected_entity}.")
             else:
                 st.subheader("Monthly Trend (by Year)")
-                # Multi-line chart with x-axis = Month_Abbr and line color = Year.
+                # Multi-line chart: x = Month_Abbr, line color = Year.
                 fig_multiline = px.line(
                     entity_data,
                     x="Month_Abbr",
@@ -154,11 +153,12 @@ def country_level_insights_dashboard(data: pd.DataFrame):
                 st.plotly_chart(fig_multiline, use_container_width=True)
 
                 st.subheader("Yearly Trend by Month")
-                # Here, pivot the data: x-axis = Year, and create a line for each month.
+                # Pivot the data: group by Year and Month_Abbr.
                 yearly_by_month = entity_data.groupby(["Year", "Month_Abbr"], as_index=False)["Tons"].sum()
                 if yearly_by_month.empty:
                     st.info("No data available for Yearly Trend by Month.")
                 else:
+                    # Multi-line chart: x-axis = Year, one line per Month.
                     fig_yearly = px.line(
                         yearly_by_month,
                         x="Year",
@@ -172,43 +172,9 @@ def country_level_insights_dashboard(data: pd.DataFrame):
                     st.plotly_chart(fig_yearly, use_container_width=True)
     
     #########################################################
-    # Tab 3: Geographic Distribution – Enhanced Choropleth Map
+    # Tab 3: Download Data
     #########################################################
     with tabs[2]:
-        st.header("Geographic Distribution")
-        if agg_data["iso_alpha"].isnull().all():
-            st.info("No ISO country codes available for the selected dimension. " +
-                    "For Reporter analysis, update the ISO mapping if necessary. " +
-                    "For Partner analysis, please update the mapping in the code.")
-        else:
-            fig_map = px.choropleth(
-                agg_data.dropna(subset=["iso_alpha"]),
-                locations="iso_alpha",
-                color="Tons",
-                hover_name=dimension,
-                color_continuous_scale=px.colors.sequential.Plasma,
-                title=f"Trade Volume by {dimension} (Geographic View)",
-                labels={"Tons": "Volume (Tons)"}
-            )
-            fig_map.update_geos(
-                showcoastlines=True,
-                coastlinecolor="RebeccaPurple",
-                showland=True,
-                landcolor="LightGreen",
-                showocean=True,
-                oceancolor="LightBlue",
-                projection_type="equirectangular"
-            )
-            fig_map.update_layout(
-                margin=dict(l=0, r=0, t=50, b=0),
-                title_font=dict(size=20)
-            )
-            st.plotly_chart(fig_map, use_container_width=True)
-
-    #########################################################
-    # Tab 4: Download Data
-    #########################################################
-    with tabs[3]:
         st.header("Download Aggregated Data")
         csv_data = agg_data.to_csv(index=False).encode("utf-8")
         st.download_button("Download Data as CSV", csv_data, "aggregated_data.csv", "text/csv")
