@@ -23,7 +23,7 @@ def apply_clustering(data: pd.DataFrame, n_clusters=3):
         data["cluster"] = 0
     return data
 
-# A helper dictionary to sort months
+# Helper dictionary to order months.
 MONTH_ORDER = {
     "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
     "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
@@ -120,29 +120,27 @@ def country_level_insights_dashboard(data: pd.DataFrame):
         st.plotly_chart(fig_donut, use_container_width=True)
     
     #########################################################
-    # Tab 2: Trend Analysis – Multi-Line Monthly and Yearly Trends
+    # Tab 2: Trend Analysis – Monthly & Yearly Visualization
     #########################################################
     with tabs[1]:
         st.header("Trend Analysis")
         if "Period" not in data.columns or "Year" not in data.columns:
             st.info("Both 'Period' and 'Year' columns are required for detailed trend analysis.")
         else:
-            # Ensure Month is extracted from the Period column if needed.
-            # If Period is in format "Jan-2012", then extract month and year.
-            # We'll assume that "Year" column is available.
-            # Create a new column "Month_Abbr" by splitting the Period (if not already available)
+            # Create a new column "Month_Abbr" from the Period column (assumed format "Jan-2012").
             if "Month_Abbr" not in data.columns:
                 data["Month_Abbr"] = data["Period"].apply(lambda x: x.split("-")[0])
-            # Order the months using MONTH_ORDER.
+            # Ensure month ordering.
             data["Month_Abbr"] = pd.Categorical(data["Month_Abbr"], categories=list(MONTH_ORDER.keys()), ordered=True)
 
-            # Let user select an entity for trend analysis.
+            # Let the user select an entity.
             selected_entity = st.selectbox(f"Select a {dimension} for Trend Analysis:", agg_data[dimension].unique())
             entity_data = data[data[dimension] == selected_entity]
             if entity_data.empty:
                 st.info(f"No trend data available for {selected_entity}.")
             else:
-                # Create a multi-line chart with Month on x-axis and separate line for each Year.
+                st.subheader("Monthly Trend (by Year)")
+                # Create a multi-line chart: x = Month_Abbr, color = Year.
                 fig_multiline = px.line(
                     entity_data,
                     x="Month_Abbr",
@@ -155,19 +153,21 @@ def country_level_insights_dashboard(data: pd.DataFrame):
                 fig_multiline.update_layout(xaxis_title="Month", yaxis_title="Volume (Tons)")
                 st.plotly_chart(fig_multiline, use_container_width=True)
 
-                # Additionally, create a yearly aggregated chart.
-                yearly_trend = entity_data.groupby("Year", as_index=False)["Tons"].sum()
                 st.subheader("Yearly Trend")
-                fig_yearly = px.bar(
-                    yearly_trend,
-                    x="Year",
-                    y="Tons",
-                    title=f"Yearly Trade Volume for {selected_entity}",
-                    text_auto=True,
-                    template="plotly_white"
-                )
-                fig_yearly.update_layout(xaxis_title="Year", yaxis_title="Volume (Tons)")
-                st.plotly_chart(fig_yearly, use_container_width=True)
+                yearly_trend = entity_data.groupby("Year", as_index=False)["Tons"].sum()
+                if yearly_trend.empty:
+                    st.info(f"No yearly trend data available for {selected_entity}.")
+                else:
+                    fig_yearly = px.bar(
+                        yearly_trend,
+                        x="Year",
+                        y="Tons",
+                        title=f"Yearly Trade Volume for {selected_entity}",
+                        text_auto=True,
+                        template="plotly_white"
+                    )
+                    fig_yearly.update_layout(xaxis_title="Year", yaxis_title="Volume (Tons)")
+                    st.plotly_chart(fig_yearly, use_container_width=True)
     
     #########################################################
     # Tab 3: Geographic Distribution – Enhanced Choropleth Map
