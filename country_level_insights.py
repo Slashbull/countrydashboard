@@ -8,9 +8,9 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     st.markdown("""
     Explore trade volume aggregated by a chosen dimension.
     
-    Use the tabs below to view an overview, trend analysis, geographic distribution, and download the aggregated data.
+    Use the tabs below to view an overview, trend analysis, geographic distribution, and to download the aggregated data.
     """)
-    
+
     # Allow user to choose the dimension for aggregation.
     dimension = st.radio("Select Dimension for Aggregation:", ("Reporter", "Partner"), index=0)
     if dimension not in data.columns:
@@ -26,7 +26,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     total_volume = agg_data["Tons"].sum()
 
     # --- ISO Mapping for Geographic Distribution ---
-    # Use different ISO mapping dictionaries for Reporter and Partner.
+    # For Reporter analysis, use a default mapping; for Partner, use a custom mapping.
     if dimension == "Reporter":
         iso_mapping = {
             "INDIA": "IND",
@@ -39,7 +39,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
             "CANADA": "CAN"
             # Extend as needed.
         }
-    else:  # dimension == "Partner"
+    else:  # For Partner
         iso_mapping = {
             "IRAQ": "IRQ",
             "UAE": "ARE",
@@ -51,7 +51,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
             "JORDAN": "JOR",
             "STATE OF PALESTINE": "PSE"
         }
-    # Map the selected dimension to ISO codes (convert to upper case for consistency).
+    # Convert names to upper case for consistent mapping.
     agg_data["iso_alpha"] = agg_data[dimension].str.upper().map(iso_mapping)
 
     # Create a multi-tab layout.
@@ -116,7 +116,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
                 st.plotly_chart(fig_trend, use_container_width=True)
     
     #########################################################
-    # Tab 3: Geographic Distribution – Choropleth Map
+    # Tab 3: Geographic Distribution – Enhanced Choropleth Map
     #########################################################
     with tabs[2]:
         st.header("Geographic Distribution")
@@ -131,7 +131,22 @@ def country_level_insights_dashboard(data: pd.DataFrame):
                 color="Tons",
                 hover_name=dimension,
                 color_continuous_scale=px.colors.sequential.Plasma,
-                title=f"Trade Volume by {dimension} (Geographic View)"
+                title=f"Trade Volume by {dimension} (Geographic View)",
+                labels={"Tons": "Volume (Tons)"}
+            )
+            # Enhance the map's layout for a modern look.
+            fig_map.update_geos(
+                showcoastlines=True,
+                coastlinecolor="RebeccaPurple",
+                showland=True,
+                landcolor="LightGreen",
+                showocean=True,
+                oceancolor="LightBlue",
+                projection_type="equirectangular"
+            )
+            fig_map.update_layout(
+                margin=dict(l=0, r=0, t=50, b=0),
+                title_font=dict(size=20)
             )
             st.plotly_chart(fig_map, use_container_width=True)
 
