@@ -11,9 +11,7 @@ from filters import apply_filters
 
 # Import dashboard modules (only those we are using)
 from market_overview import market_overview_dashboard
-from detailed_analysis import detailed_analysis_dashboard
-from ai_based_alerts import ai_based_alerts_dashboard
-from forecasting import forecasting_dashboard
+from Alerts_Forcasting import alerts_forecasting_dashboard
 from country_level_insights import country_level_insights_dashboard
 from time_series_decomposition import time_series_decomposition_dashboard
 from reporting import reporting_dashboard
@@ -191,12 +189,8 @@ def main():
             filtered_df, _ = apply_filters(df)
             if selected_page == "Market Overview":
                 market_overview_dashboard(filtered_df)
-            elif selected_page == "Detailed Analysis":
-                detailed_analysis_dashboard(filtered_df)
             elif selected_page == "AI-Based Alerts":
-                ai_based_alerts_dashboard(filtered_df)
-            elif selected_page == "Forecasting":
-                forecasting_dashboard(filtered_df)
+                alerts_forecasting_dashboard(filtered_df)
             elif selected_page == "Country-Level Insights":
                 country_level_insights_dashboard(filtered_df)
             elif selected_page == "Time Series Decomposition":
