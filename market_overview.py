@@ -210,22 +210,27 @@ def market_overview_dashboard(data: pd.DataFrame):
         else:
             st.info("Not enough year data to compute YoY growth.")
         
-        # New: Yearly Trade Volume Chart by Month
+        # New: Yearly Trade Volume Breakdown by Month
         st.markdown("---")
         st.subheader("Yearly Trade Volume Breakdown by Month")
         if df["Year"].nunique() > 1:
-            # Create a pivot table: rows=Year, columns=Month (as abbreviated)
+            # Create a pivot table with Year as rows and Month as columns
             yearly_monthly = df.pivot_table(index="Year", columns="Month", values="Tons", aggfunc="sum", fill_value=0)
-            # Sort columns by month order (if numeric months are present)
-            try:
-                yearly_monthly = yearly_monthly.reindex(columns=sorted(yearly_monthly.columns, key=lambda m: int(m) if str(m).isdigit() else m))
-            except:
-                # If not numeric, assume already in order.
-                pass
+            # Sort columns: try numeric conversion first; otherwise use mapping for abbreviated months
+            month_order = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+                           "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+            def sort_key(m):
+                try:
+                    return int(m)
+                except:
+                    return month_order.get(m, 99)
+            sorted_columns = sorted(yearly_monthly.columns, key=sort_key)
+            yearly_monthly = yearly_monthly[sorted_columns]
+            # Use px.imshow with the underlying NumPy array
             fig_yearly_monthly = px.imshow(
-                yearly_monthly,
+                yearly_monthly.values,
                 labels=dict(x="Month", y="Year", color="Volume (Tons)"),
-                x=yearly_monthly.columns,
+                x=sorted_columns,
                 y=yearly_monthly.index,
                 title="Yearly Trade Volume Breakdown by Month",
                 color_continuous_scale="Viridis"
