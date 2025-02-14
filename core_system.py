@@ -1,4 +1,3 @@
-# core_system.py
 import streamlit as st
 import pandas as pd
 import requests
@@ -10,18 +9,13 @@ from datetime import datetime
 import config
 from filters import apply_filters
 
-# Import dashboard modules (assumed to exist)
+# Import dashboard modules (only those we are using)
 from market_overview import market_overview_dashboard
 from detailed_analysis import detailed_analysis_dashboard
 from ai_based_alerts import ai_based_alerts_dashboard
 from forecasting import forecasting_dashboard
 from country_level_insights import country_level_insights_dashboard
-from segmentation_analysis import segmentation_analysis_dashboard
-from correlation_analysis import correlation_analysis_dashboard
 from time_series_decomposition import time_series_decomposition_dashboard
-from calendar_insights import calendar_insights_dashboard
-from climate_insights import yearly_crop_review_dashboard
-from scenario_simulation import scenario_simulation_dashboard
 from reporting import reporting_dashboard
 
 # -----------------------------------------------------------------------------
@@ -75,7 +69,7 @@ def load_csv(file) -> pd.DataFrame:
         return df
     except Exception as e:
         st.error(f"Error loading CSV: {e}")
-        logger.error("Error: %s", e)
+        logger.error("Error loading CSV: %s", e)
         return pd.DataFrame()
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -162,17 +156,18 @@ def get_current_data():
 def display_footer():
     st.markdown("<div style='text-align:center; padding:10px; color:#666;'>© 2025 TradeDataDashboard. All rights reserved.</div>", unsafe_allow_html=True)
 
+# -----------------------------------------------------------------------------
+# MAIN FUNCTION
+# -----------------------------------------------------------------------------
 def main():
     authenticate_user()
     logout_button()
     
-    # Simple sidebar navigation using st.sidebar.radio
+    # Navigation using a sidebar radio button
     selected_page = st.sidebar.radio(
         "Navigation",
         ("Home", "Market Overview", "Detailed Analysis", "AI-Based Alerts", "Forecasting", 
-         "Country-Level Insights", "Segmentation Analysis", "Correlation Analysis", 
-         "Time Series Decomposition", "Calendar Insights", "Climate Insights", 
-         "Scenario Simulation", "Reporting")
+         "Country-Level Insights", "Time Series Decomposition", "Reporting")
     )
     st.sidebar.button("Reset Filters", on_click=reset_filters)
     st.session_state["page"] = selected_page
@@ -191,7 +186,7 @@ def main():
     else:
         df = get_current_data()
         if df is None or df.empty:
-            st.error("No data available. Please upload data on Home page.")
+            st.error("No data available. Please upload data on the Home page.")
         else:
             filtered_df, _ = apply_filters(df)
             if selected_page == "Market Overview":
@@ -204,18 +199,8 @@ def main():
                 forecasting_dashboard(filtered_df)
             elif selected_page == "Country-Level Insights":
                 country_level_insights_dashboard(filtered_df)
-            elif selected_page == "Segmentation Analysis":
-                segmentation_analysis_dashboard(filtered_df)
-            elif selected_page == "Correlation Analysis":
-                correlation_analysis_dashboard(filtered_df)
             elif selected_page == "Time Series Decomposition":
                 time_series_decomposition_dashboard(filtered_df)
-            elif selected_page == "Calendar Insights":
-                calendar_insights_dashboard(filtered_df)
-            elif selected_page == "Climate Insights":
-               yearly_crop_review_dashboard(filtered_df)
-            elif selected_page == "Scenario Simulation":
-                scenario_simulation_dashboard(filtered_df)
             elif selected_page == "Reporting":
                 reporting_dashboard(filtered_df)
     
