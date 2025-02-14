@@ -10,32 +10,38 @@ import plotly.express as px
 # =============================================================================
 def generate_summary(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Generate a summary DataFrame with key metrics.
-    Metrics include:
+    Generate a summary DataFrame with key metrics:
       - Total Imports (Tons)
       - Total Records
       - Average Tons per Record
       - Top Reporter (by volume)
       - Top Partner (by volume)
       - Peak Year (by total volume)
+      - Top Flow (by volume)
     """
     total_tons = df["Tons"].sum()
     total_records = df.shape[0]
     avg_tons = total_tons / total_records if total_records > 0 else 0
 
     # Top Reporter
-    reporter_agg = df.groupby("Reporter")["Tons"].sum().reset_index()
-    if not reporter_agg.empty:
-        top_reporter_row = reporter_agg.sort_values("Tons", ascending=False).iloc[0]
-        top_reporter = f"{top_reporter_row['Reporter']} ({top_reporter_row['Tons']:,.2f} Tons)"
+    if "Reporter" in df.columns:
+        reporter_agg = df.groupby("Reporter")["Tons"].sum().reset_index()
+        if not reporter_agg.empty:
+            top_reporter_row = reporter_agg.sort_values("Tons", ascending=False).iloc[0]
+            top_reporter = f"{top_reporter_row['Reporter']} ({top_reporter_row['Tons']:,.2f} Tons)"
+        else:
+            top_reporter = "N/A"
     else:
         top_reporter = "N/A"
 
     # Top Partner
-    partner_agg = df.groupby("Partner")["Tons"].sum().reset_index()
-    if not partner_agg.empty:
-        top_partner_row = partner_agg.sort_values("Tons", ascending=False).iloc[0]
-        top_partner = f"{top_partner_row['Partner']} ({top_partner_row['Tons']:,.2f} Tons)"
+    if "Partner" in df.columns:
+        partner_agg = df.groupby("Partner")["Tons"].sum().reset_index()
+        if not partner_agg.empty:
+            top_partner_row = partner_agg.sort_values("Tons", ascending=False).iloc[0]
+            top_partner = f"{top_partner_row['Partner']} ({top_partner_row['Tons']:,.2f} Tons)"
+        else:
+            top_partner = "N/A"
     else:
         top_partner = "N/A"
 
@@ -49,6 +55,17 @@ def generate_summary(df: pd.DataFrame) -> pd.DataFrame:
             peak_year = "N/A"
     else:
         peak_year = "N/A"
+    
+    # Top Flow
+    if "Flow" in df.columns:
+        flow_agg = df.groupby("Flow")["Tons"].sum().reset_index()
+        if not flow_agg.empty:
+            top_flow_row = flow_agg.sort_values("Tons", ascending=False).iloc[0]
+            top_flow = f"{top_flow_row['Flow']} ({top_flow_row['Tons']:,.2f} Tons)"
+        else:
+            top_flow = "N/A"
+    else:
+        top_flow = "N/A"
 
     summary_data = {
         "Metric": [
@@ -57,7 +74,8 @@ def generate_summary(df: pd.DataFrame) -> pd.DataFrame:
             "Average Tons per Record",
             "Top Reporter",
             "Top Partner",
-            "Peak Year"
+            "Peak Year",
+            "Top Flow"
         ],
         "Value": [
             f"{total_tons:,.2f}",
@@ -65,7 +83,8 @@ def generate_summary(df: pd.DataFrame) -> pd.DataFrame:
             f"{avg_tons:,.2f}",
             top_reporter,
             top_partner,
-            peak_year
+            peak_year,
+            top_flow
         ]
     }
     return pd.DataFrame(summary_data)
@@ -93,17 +112,21 @@ def generate_auto_insights(df: pd.DataFrame) -> str:
             year_agg = df.groupby("Year")["Tons"].sum()
             peak_year = year_agg.idxmax()
             insights.append(f"Peak year for imports is {peak_year} with {year_agg.max():,.2f} tons.")
+        if "Flow" in df.columns:
+            flow_agg = df.groupby("Flow")["Tons"].sum()
+            top_flow = flow_agg.idxmax()
+            insights.append(f"Most traded flow type is {top_flow} with {flow_agg.max():,.2f} tons.")
         return " ".join(insights)
     except Exception as e:
         return f"Insights not available due to error: {e}"
 
 # =============================================================================
-# EXPORT FUNCTIONS
+# EXPORT FUNCTIONS (CSV & Excel)
 # =============================================================================
 def export_to_csv(df: pd.DataFrame, columns: list, include_summary: bool, include_insights: bool) -> bytes:
     """
     Export selected columns to CSV.
-    Optionally include summary metrics and auto insights as commented header lines.
+    Optionally, prepend summary metrics and auto insights as commented header lines.
     """
     data_to_export = df[columns]
     csv_buffer = io.StringIO()
@@ -122,8 +145,8 @@ def export_to_csv(df: pd.DataFrame, columns: list, include_summary: bool, includ
 def export_to_excel(df: pd.DataFrame, columns: list, include_summary: bool, include_insights: bool) -> bytes:
     """
     Export selected columns to an Excel file with two sheets:
-      - "Data": Main report data.
-      - "Summary": Key metrics and auto-generated insights.
+      - "Data": The main report data.
+      - "Summary": Summary metrics and auto‑generated insights.
     """
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -141,27 +164,26 @@ def export_to_excel(df: pd.DataFrame, columns: list, include_summary: bool, incl
 # =============================================================================
 def overall_dashboard_report(data: pd.DataFrame):
     st.title("📊 Overall Dashboard Summary Report")
-
+    
     if data is None or data.empty:
         st.warning("⚠️ No data available. Please upload a dataset first.")
         return
-
-    # Ensure numeric conversion for Tons.
+    
+    # Ensure "Tons" is numeric and create a Period column if not present.
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
     if "Period" not in data.columns:
-        # Create a simple Period column if not present.
         data["Period"] = data["Month"].astype(str) + "-" + data["Year"].astype(str)
-
-    # Display KPIs.
+    
+    # Display key metrics
     summary_df = generate_summary(data)
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
-    for i, row in summary_df.iterrows():
-        st.metric(row["Metric"], row["Value"])
-
+    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    metrics = summary_df["Metric"].tolist()
+    values = summary_df["Value"].tolist()
+    for i in range(len(metrics)):
+        st.metric(metrics[i], values[i])
+    
     st.markdown("---")
     st.subheader("Interactive Charts")
-
-    # Create tabs for different visualizations.
     tabs = st.tabs(["Market Trend", "Reporter Analysis", "Partner Analysis", "Yearly Trend"])
     
     # Market Trend Tab
@@ -200,12 +222,11 @@ def overall_dashboard_report(data: pd.DataFrame):
             st.plotly_chart(fig_year, use_container_width=True)
         else:
             st.info("Year data not available.")
-
+    
     st.markdown("---")
     st.subheader("Overall Report Summary")
     st.dataframe(summary_df)
     st.markdown(f"**Auto Insights:** {generate_auto_insights(data)}")
-    
     st.success("✅ Overall Dashboard Summary Report Loaded Successfully!")
 
 # =============================================================================
@@ -241,16 +262,16 @@ def reporting_data_exports(data: pd.DataFrame):
     st.success("✅ Report Generation Ready!")
 
 # =============================================================================
-# OVERALL MODULE ENTRY-POINT
+# OVERALL REPORTING DASHBOARD ENTRY-POINT
 # =============================================================================
 def overall_reporting_dashboard(data: pd.DataFrame):
     st.title("📝 Reporting Dashboard")
-    st.markdown("Select a view from the tabs below to explore summary reports or export data.")
+    st.markdown("Select a view from the tabs below to explore interactive reports or export data.")
     
     tabs = st.tabs(["Interactive Report", "Export & Download"])
     with tabs[0]:
         overall_dashboard_report(data)
     with tabs[1]:
         reporting_data_exports(data)
-
+    
     st.success("✅ Reporting Dashboard loaded successfully!")
