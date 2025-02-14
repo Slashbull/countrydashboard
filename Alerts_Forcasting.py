@@ -1,4 +1,3 @@
-# Alerts_Forcasting.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,21 +7,21 @@ from sklearn.ensemble import IsolationForest
 def alerts_forecasting_dashboard(data: pd.DataFrame):
     st.title("🔮 Alerts & Forecasting Dashboard")
     st.markdown("""
-    This module combines AI-based alerts with forecasting functionality.  
+    This module combines advanced AI-based anomaly detection with forecasting functionality.  
     Use the tabs below to switch between alert analysis and forecasting.
     """)
 
-    # Validate required columns for both functionalities.
+    # Validate that required columns are present.
     required_cols = ["Partner", "Period", "Tons"]
     missing = [col for col in required_cols if col not in data.columns]
     if missing:
         st.error(f"🚨 Missing required columns: {', '.join(missing)}")
         return
 
-    # Ensure Tons is numeric
+    # Ensure that the 'Tons' column is numeric.
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
 
-    # Create tabs for Alerts and Forecasting
+    # Create two tabs: one for Alerts and one for Forecasting.
     tabs = st.tabs(["AI Alerts", "Forecasting"])
 
     # -----------------------------
@@ -31,27 +30,30 @@ def alerts_forecasting_dashboard(data: pd.DataFrame):
     with tabs[0]:
         st.header("Advanced AI-Based Alerts")
         st.markdown("""
-        Choose between a **Basic Threshold** method and **Advanced Anomaly Detection** using IsolationForest.  
-        You can also compare both methods side-by-side.
+        Choose an alert method below:
+        
+        - **Basic Threshold:** Flags partners where the latest period’s percentage change exceeds a specified threshold.
+        - **Advanced Anomaly Detection:** Uses IsolationForest to automatically detect anomalies.
+        - **Comparison:** Compares both methods side-by-side.
         """)
 
-        # Aggregate data by Partner and Period (summing Tons)
+        # Aggregate data by Partner and Period, summing up Tons.
         grouped = data.groupby(["Partner", "Period"])["Tons"].sum().unstack(fill_value=0)
         if grouped.shape[1] < 2:
             st.info("Not enough period data to compute alerts.")
         else:
-            # Calculate period-over-period percentage change
+            # Calculate period-over-period percentage changes.
             pct_change = grouped.pct_change(axis=1) * 100
             pct_change = pct_change.round(2)
-            # Latest period label
-            latest_period = pct_change.columns[-1]
-            # Choose alert method
+            latest_period = pct_change.columns[-1]  # Latest period label.
+
+            # Let user choose the alert method.
             alert_method = st.radio("Select Alert Method:", 
                                     ["Basic Threshold", "Advanced Anomaly Detection", "Comparison"])
+
             if alert_method == "Basic Threshold":
                 st.subheader("Basic Threshold Alerts")
-                threshold = st.slider("Alert Threshold (% Change)", min_value=0, max_value=100, 
-                                      value=20, step=5)
+                threshold = st.slider("Alert Threshold (% Change)", min_value=0, max_value=100, value=20, step=5)
                 basic_alerts = pct_change[pct_change[latest_period].abs() >= threshold][[latest_period]].reset_index()
                 basic_alerts.columns = ["Partner", "Latest % Change"]
                 st.markdown("**Alerts (Basic Threshold):**")
@@ -73,7 +75,7 @@ def alerts_forecasting_dashboard(data: pd.DataFrame):
 
             elif alert_method == "Advanced Anomaly Detection":
                 st.subheader("Advanced Anomaly Detection Alerts")
-                st.markdown("Using IsolationForest to detect anomalies in the latest period's percentage changes.")
+                st.markdown("IsolationForest automatically detects anomalies in the latest period’s percentage changes.")
                 contamination = st.slider("IsolationForest Contamination (Expected Outlier Fraction)",
                                           min_value=0.01, max_value=0.5, value=0.1, step=0.01)
                 latest_pct = pct_change[latest_period].fillna(0).values.reshape(-1, 1)
@@ -105,6 +107,7 @@ def alerts_forecasting_dashboard(data: pd.DataFrame):
                                       min_value=0, max_value=100, value=20, step=5, key="comp_threshold")
                 basic_alerts = pct_change[pct_change[latest_period].abs() >= threshold][[latest_period]].reset_index()
                 basic_alerts.columns = ["Partner", "Latest % Change"]
+
                 contamination = st.slider("IsolationForest Contamination (Advanced Method)",
                                           min_value=0.01, max_value=0.5, value=0.1, step=0.01, key="comp_contam")
                 latest_pct = pct_change[latest_period].fillna(0).values.reshape(-1, 1)
@@ -145,7 +148,7 @@ def alerts_forecasting_dashboard(data: pd.DataFrame):
                 else:
                     st.info("No alerts detected by either method.")
 
-            st.success("✅ Advanced AI-Based Alerts loaded successfully!")
+            st.success("✅ AI-Based Alerts loaded successfully!")
 
     # -----------------------------
     # Tab 2: Forecasting
@@ -159,7 +162,7 @@ def alerts_forecasting_dashboard(data: pd.DataFrame):
         if len(monthly) < 3:
             st.info("Not enough data to forecast.")
         else:
-            # Simple rolling average forecasting over a window of 3 periods.
+            # Forecasting using a simple rolling average over a window of 3 periods.
             monthly["Forecast"] = monthly["Tons"].rolling(window=3).mean()
             forecast_value = monthly["Forecast"].iloc[-1]
             forecast_df = pd.DataFrame({"Period": ["Next Period"], "Tons": [np.nan], "Forecast": [forecast_value]})
@@ -183,3 +186,6 @@ def alerts_forecasting_dashboard(data: pd.DataFrame):
             )
             st.plotly_chart(fig, use_container_width=True)
             st.success("✅ Forecasting loaded successfully!")
+
+if __name__ == "__main__":
+    alerts_forecasting_dashboard(pd.DataFrame())
