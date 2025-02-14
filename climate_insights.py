@@ -5,23 +5,24 @@ import plotly.express as px
 from datetime import datetime
 
 # ------------------------------
-# Helper functions
+# Helper Functions
 # ------------------------------
 
 def get_weather_data(latitude: float, longitude: float, start_date: str, end_date: str) -> pd.DataFrame:
     """
-    Fetch historical weather data (daily rainfall and temperature) from Open-Meteo's ERA5 Archive API.
-    The API returns daily maximum & minimum temperatures and precipitation sum.
+    Fetch historical weather data from the Open‑Meteo ERA5 Archive API.
+    Uses the latest endpoint as per the documentation:
+      https://open-meteo.com/en/docs/historical-weather-api
     
     Parameters:
       - latitude: Latitude of the location.
       - longitude: Longitude of the location.
-      - start_date: Start date in YYYY-MM-DD format.
-      - end_date: End date in YYYY-MM-DD format.
-      
+      - start_date: Start date (YYYY-MM-DD).
+      - end_date: End date (YYYY-MM-DD).
+    
     Returns:
-      - A pandas DataFrame with columns: time, temperature_2m_max, temperature_2m_min, precipitation_sum,
-        plus computed 'temperature_avg' and 'date'.
+      - A DataFrame containing daily max/min temperatures and precipitation sum,
+        plus a computed average temperature and converted date column.
     """
     base_url = "https://archive-api.open-meteo.com/v1/era5"
     params = {
@@ -32,37 +33,50 @@ def get_weather_data(latitude: float, longitude: float, start_date: str, end_dat
         "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum",
         "timezone": "auto"
     }
-    response = requests.get(base_url, params=params)
-    response.raise_for_status()  # Raise exception for HTTP errors
-    data = response.json()
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()  # Raise an error for HTTP issues
+        data = response.json()
+    except Exception as e:
+        st.error(f"Error fetching weather data: {e}")
+        return pd.DataFrame()
+
     if "daily" not in data:
         st.error("No daily weather data returned by the API.")
         return pd.DataFrame()
+    
     df = pd.DataFrame(data["daily"])
-    # Compute daily average temperature
+    # Compute the daily average temperature
     df["temperature_avg"] = (df["temperature_2m_max"] + df["temperature_2m_min"]) / 2
+    # Convert the time column to datetime
     df["date"] = pd.to_datetime(df["time"])
     return df
 
 def evaluate_crop_outcome(avg_rainfall: float, avg_temp: float) -> str:
     """
-    Evaluate the expected outcome for date crop cultivation based on average rainfall and temperature.
+    Evaluate date crop outcome based on average rainfall and temperature.
     
-    These thresholds are examples and should be adjusted to reflect agronomic insights.
+    These thresholds are examples; adjust them based on expert insights for date cultivation.
+    For example, in your use case, conditions may be:
+      - Excellent: avg_rainfall >= 14 mm and avg_temp between 37°C and 39°C
+      - Good:      avg_rainfall between 12 and 14 mm and avg_temp between 37°C and 40°C
+      - Moderate:  avg_rainfall between 10 and 12 mm or avg_temp slightly outside optimal range
+      - Poor:      Otherwise.
     """
-    # Example thresholds for date cultivation (adjust as needed):
-    if avg_rainfall >= 16 and 36 <= avg_temp <= 38:
+    if avg_rainfall >= 14 and 37 <= avg_temp <= 39:
         return "Excellent"
-    elif 14 <= avg_rainfall < 16 and 36 <= avg_temp <= 39:
-        return "Good"
     elif 12 <= avg_rainfall < 14 and 37 <= avg_temp <= 40:
+        return "Good"
+    elif 10 <= avg_rainfall < 12 or not (36 <= avg_temp <= 40):
         return "Moderate"
     else:
         return "Poor"
 
 def generate_yearly_summary(weather_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute yearly average rainfall and temperature from daily data and determine the dominant crop outcome.
+    Generate a yearly summary DataFrame from daily weather data.
+    Computes the average daily precipitation and temperature per year,
+    then determines the dominant crop outcome based on these averages.
     """
     weather_df["year"] = weather_df["date"].dt.year
     summary = weather_df.groupby("year").agg({
@@ -86,31 +100,24 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
     for rainfall and temperature. Based on these metrics, it evaluates the expected outcome of date crops.
     """)
     
-    # For this example, we focus on the Al-Madinah region in Saudi Arabia.
+    # For this example, we focus on a region in Saudi Arabia where dates are predominantly grown.
     st.subheader("Select Region")
-    # You can extend this list to include multiple regions with proper coordinates.
+    # Extend this dictionary if you wish to include more regions.
     region = st.selectbox("Region", ["Al-Madinah"], index=0)
-    
-    # Coordinates for Al-Madinah (approximate)
     region_coords = {
-        "Al-Madinah": {"latitude": 24.5247, "longitude": 39.5692}
+        "Al-Madinah": {"latitude": 24.5247, "longitude": 39.5692}  # Approximate coordinates
     }
     coords = region_coords.get(region)
     if not coords:
         st.error("No coordinate mapping available for the selected region.")
         return
 
-    # Define the date range for historical data
+    # Define the date range for historical data.
     start_date = "2012-01-01"
     end_date = datetime.today().strftime("%Y-%m-%d")
     st.info(f"Fetching weather data for {region} from {start_date} to {end_date}...")
-    
-    try:
-        weather_df = get_weather_data(coords["latitude"], coords["longitude"], start_date, end_date)
-    except Exception as e:
-        st.error(f"Error fetching weather data: {e}")
-        return
 
+    weather_df = get_weather_data(coords["latitude"], coords["longitude"], start_date, end_date)
     if weather_df.empty:
         st.error("No weather data available.")
         return
@@ -124,7 +131,7 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         "avg_temp": "{:.1f}°C"
     }))
 
-    # Create a line chart for daily climate trends over time.
+    # Create an interactive line chart for daily climate trends.
     st.markdown("## Daily Climate Trends")
     fig = px.line(weather_df, x="date", y=["precipitation_sum", "temperature_avg"],
                   labels={"value": "Measurement", "date": "Date"},
@@ -132,7 +139,6 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
     fig.update_layout(template="plotly_white")
     st.plotly_chart(fig, use_container_width=True)
 
-    # Display overall insights in a summary format.
     st.markdown("### Yearly Crop Outcome Summary")
     for _, row in yearly_summary.iterrows():
         st.markdown(f"**{row['year']}**: Avg Rainfall = {row['avg_rainfall']:.1f} mm, "
@@ -140,10 +146,9 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
     
     st.success("✅ Yearly Date Crop Review Dashboard loaded successfully!")
 
-# For testing standalone
+# For standalone testing
 if __name__ == "__main__":
-    # For standalone testing, simulate a dummy DataFrame.
-    # In actual use, 'data' will be your trade data.
+    # For testing, you can simulate with a dummy DataFrame. In production, 'data' is your trade data.
     dummy_data = pd.DataFrame({
         "Reporter": ["India"] * 10,
         "Flow": ["Import"] * 10,
