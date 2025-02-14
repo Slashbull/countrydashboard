@@ -14,7 +14,7 @@ from market_overview import market_overview_dashboard
 from Alerts_Forcasting import alerts_forecasting_dashboard
 from country_level_insights import country_level_insights_dashboard
 from time_series_decomposition import time_series_decomposition_dashboard
-from reporting import reporting_dashboard
+from reporting import overall_reporting_dashboard
 
 # -----------------------------------------------------------------------------
 # Set page configuration (must be the first Streamlit command)
@@ -161,7 +161,7 @@ def main():
     authenticate_user()
     logout_button()
     
-    # Navigation options based on our final structure.
+    # Navigation options based on our project structure.
     nav_options = [
         "Home", 
         "Market Overview", 
@@ -201,7 +201,7 @@ def main():
             elif selected_page == "Time Series Decomposition":
                 time_series_decomposition_dashboard(filtered_df)
             elif selected_page == "Reporting":
-                reporting_dashboard(filtered_df)
+                overall_reporting_dashboard(filtered_df)
     
     display_footer()
 
