@@ -161,7 +161,7 @@ def main():
     authenticate_user()
     logout_button()
     
-    # Navigation options based on your final structure.
+    # Navigation options based on our final structure.
     nav_options = [
         "Home", 
         "Market Overview", 
