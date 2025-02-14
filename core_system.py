@@ -114,10 +114,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     'Period' column from 'Month' and 'Year'. Supports both numeric and abbreviated month values.
     """
     if "Tons" in df.columns:
-        df["Tons"] = pd.to_numeric(
-            df["Tons"].astype(str).str.replace(",", "", regex=False),
-            errors="coerce"
-        )
+        df["Tons"] = pd.to_numeric(df["Tons"].astype(str).str.replace(",", "", regex=False), errors="coerce")
     if "Year" in df.columns and "Month" in df.columns:
         try:
             def parse_period(row):
@@ -204,7 +201,7 @@ def reset_data():
 def reset_filters():
     """
     Clear all filter selections stored in session_state.
-    This function assumes filter widgets have keys that start with "multiselect_".
+    This function deletes all keys starting with "multiselect_".
     """
     filter_keys = [key for key in st.session_state.keys() if key.startswith("multiselect_")]
     for key in filter_keys:
@@ -266,15 +263,16 @@ def main():
                 "nav-link-selected": {"background-color": "#02ab21"},
             }
         )
-        # Additional buttons in the sidebar for resetting data and filters.
+        # Additional sidebar buttons.
         if st.button("Reset Filters", key="reset_filters"):
             reset_filters()
+        # Display last updated information if available.
         if "data" in st.session_state and "Period_dt" in st.session_state["data"].columns:
             last_updated = st.session_state["data"]["Period_dt"].max().strftime("%b-%Y")
             st.info(f"Data Last Updated: {last_updated}")
     st.session_state["page"] = selected_page
 
-    # Data reset button always available in sidebar.
+    # Always show the reset data button.
     reset_data()
 
     if selected_page == "Home":
