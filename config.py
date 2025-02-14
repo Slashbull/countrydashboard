@@ -24,16 +24,9 @@ USE_PERMANENT_GOOGLE_SHEET_LINK = bool(PERMANENT_GOOGLE_SHEET_LINK)
 # =============================================================================
 # Logging and Caching Settings
 # =============================================================================
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")  # e.g., DEBUG, INFO, WARNING, ERROR
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")  # Options: DEBUG, INFO, WARNING, ERROR
 CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", 50))
-
-# =============================================================================
-# Weather API Configuration
-# =============================================================================
-# API key for OpenWeather (if you choose to use it)
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "94a02ef435d347d590b105838251402")
 
 # =============================================================================
 # Additional settings can be added here as needed.
 # =============================================================================
-
