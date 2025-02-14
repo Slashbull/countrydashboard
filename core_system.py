@@ -20,7 +20,7 @@ from segmentation_analysis import segmentation_analysis_dashboard
 from correlation_analysis import correlation_analysis_dashboard
 from time_series_decomposition import time_series_decomposition_dashboard
 from calendar_insights import calendar_insights_dashboard
-from climate_insights import date_crop_analysis_dashboard
+from climate_insights import yearly_crop_review_dashboard
 from scenario_simulation import scenario_simulation_dashboard
 from reporting import reporting_dashboard
 
@@ -213,7 +213,7 @@ def main():
             elif selected_page == "Calendar Insights":
                 calendar_insights_dashboard(filtered_df)
             elif selected_page == "Climate Insights":
-                date_crop_analysis_dashboard(filtered_df)
+               yearly_crop_review_dashboard(filtered_df)
             elif selected_page == "Scenario Simulation":
                 scenario_simulation_dashboard(filtered_df)
             elif selected_page == "Reporting":
