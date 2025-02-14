@@ -23,12 +23,18 @@ def apply_clustering(data: pd.DataFrame, n_clusters=3):
         data["cluster"] = 0
     return data
 
+# A helper dictionary to sort months
+MONTH_ORDER = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+    "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
+}
+
 def country_level_insights_dashboard(data: pd.DataFrame):
     st.title("🌍 Country-Level Insights Dashboard")
     st.markdown("""
     Explore trade volume aggregated by a chosen dimension.
     
-    Use the tabs below to view an overview, trend analysis (monthly & yearly), geographic distribution, and download the aggregated data.
+    Use the tabs below to view an overview, trend analysis, geographic distribution, and download the aggregated data.
     """)
 
     # Allow user to choose the dimension for aggregation.
@@ -45,7 +51,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     agg_data = agg_data.sort_values("Tons", ascending=False)
     total_volume = agg_data["Tons"].sum()
 
-    # Apply clustering for additional insights.
+    # Apply clustering (for additional insights).
     agg_data = apply_clustering(agg_data)
 
     # --- ISO Mapping for Geographic Distribution ---
@@ -114,52 +120,54 @@ def country_level_insights_dashboard(data: pd.DataFrame):
         st.plotly_chart(fig_donut, use_container_width=True)
     
     #########################################################
-    # Tab 2: Trend Analysis – Monthly & Yearly Visualization
+    # Tab 2: Trend Analysis – Multi-Line Monthly and Yearly Trends
     #########################################################
     with tabs[1]:
         st.header("Trend Analysis")
-        if "Period" not in data.columns:
-            st.info("No 'Period' column available for time series analysis.")
+        if "Period" not in data.columns or "Year" not in data.columns:
+            st.info("Both 'Period' and 'Year' columns are required for detailed trend analysis.")
         else:
-            # Let the user select a specific entity.
+            # Ensure Month is extracted from the Period column if needed.
+            # If Period is in format "Jan-2012", then extract month and year.
+            # We'll assume that "Year" column is available.
+            # Create a new column "Month_Abbr" by splitting the Period (if not already available)
+            if "Month_Abbr" not in data.columns:
+                data["Month_Abbr"] = data["Period"].apply(lambda x: x.split("-")[0])
+            # Order the months using MONTH_ORDER.
+            data["Month_Abbr"] = pd.Categorical(data["Month_Abbr"], categories=list(MONTH_ORDER.keys()), ordered=True)
+
+            # Let user select an entity for trend analysis.
             selected_entity = st.selectbox(f"Select a {dimension} for Trend Analysis:", agg_data[dimension].unique())
-            
-            # Monthly Trend
-            st.subheader("Monthly Trend")
-            monthly_trend = data[data[dimension] == selected_entity].groupby("Period", as_index=False)["Tons"].sum()
-            if monthly_trend.empty:
-                st.info(f"No monthly trend data available for {selected_entity}.")
+            entity_data = data[data[dimension] == selected_entity]
+            if entity_data.empty:
+                st.info(f"No trend data available for {selected_entity}.")
             else:
-                fig_monthly = px.line(
-                    monthly_trend,
-                    x="Period",
+                # Create a multi-line chart with Month on x-axis and separate line for each Year.
+                fig_multiline = px.line(
+                    entity_data,
+                    x="Month_Abbr",
                     y="Tons",
-                    title=f"Monthly Trade Volume Trend for {selected_entity}",
+                    color="Year",
+                    title=f"Monthly Trend for {selected_entity} by Year",
                     markers=True,
                     template="plotly_white"
                 )
-                fig_monthly.update_layout(xaxis_title="Period", yaxis_title="Volume (Tons)")
-                st.plotly_chart(fig_monthly, use_container_width=True)
-            
-            # Yearly Trend
-            if "Year" in data.columns:
+                fig_multiline.update_layout(xaxis_title="Month", yaxis_title="Volume (Tons)")
+                st.plotly_chart(fig_multiline, use_container_width=True)
+
+                # Additionally, create a yearly aggregated chart.
+                yearly_trend = entity_data.groupby("Year", as_index=False)["Tons"].sum()
                 st.subheader("Yearly Trend")
-                yearly_trend = data[data[dimension] == selected_entity].groupby("Year", as_index=False)["Tons"].sum()
-                if yearly_trend.empty:
-                    st.info(f"No yearly trend data available for {selected_entity}.")
-                else:
-                    fig_yearly = px.bar(
-                        yearly_trend,
-                        x="Year",
-                        y="Tons",
-                        title=f"Yearly Trade Volume for {selected_entity}",
-                        text_auto=True,
-                        template="plotly_white"
-                    )
-                    fig_yearly.update_layout(xaxis_title="Year", yaxis_title="Volume (Tons)")
-                    st.plotly_chart(fig_yearly, use_container_width=True)
-            else:
-                st.info("Year data not available for yearly trend analysis.")
+                fig_yearly = px.bar(
+                    yearly_trend,
+                    x="Year",
+                    y="Tons",
+                    title=f"Yearly Trade Volume for {selected_entity}",
+                    text_auto=True,
+                    template="plotly_white"
+                )
+                fig_yearly.update_layout(xaxis_title="Year", yaxis_title="Volume (Tons)")
+                st.plotly_chart(fig_yearly, use_container_width=True)
     
     #########################################################
     # Tab 3: Geographic Distribution – Enhanced Choropleth Map
