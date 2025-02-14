@@ -18,7 +18,7 @@ def market_overview_dashboard(data: pd.DataFrame):
     # --- Ensure 'Tons' is Numeric ---
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
     
-    # Work on a copy of the data.
+    # Work on a copy of the data
     df = data.copy()
     
     # --- Create 'Period' Column if Not Present ---
@@ -27,7 +27,6 @@ def market_overview_dashboard(data: pd.DataFrame):
             def parse_period(row):
                 m = row["Month"]
                 y = str(row["Year"])
-                # If Month is numeric, parse as month number; else as abbreviated month.
                 if str(m).isdigit():
                     return datetime.strptime(f"{int(m)} {y}", "%m %Y")
                 else:
@@ -49,7 +48,7 @@ def market_overview_dashboard(data: pd.DataFrame):
     unique_reporters = df["Reporter"].nunique()
     avg_volume_partner = total_volume / unique_partners if unique_partners > 0 else 0
 
-    # Calculate Month-over-Month (MoM) Growth using the defined categorical order.
+    # Month-over-Month (MoM) Growth
     periods = list(df["Period"].cat.categories)
     if len(periods) >= 2:
         last_period = periods[-1]
@@ -60,7 +59,7 @@ def market_overview_dashboard(data: pd.DataFrame):
     else:
         mom_growth = 0
 
-    # Year-over-Year (YoY) Growth if multiple years exist.
+    # Year-over-Year (YoY) Growth if multiple years exist
     if df["Year"].nunique() > 1:
         yearly_vol = df.groupby("Year")["Tons"].sum().reset_index().sort_values("Year")
         if len(yearly_vol) >= 2:
@@ -72,13 +71,12 @@ def market_overview_dashboard(data: pd.DataFrame):
     else:
         yoy_growth = None
 
-    # Identify the top partner by volume.
+    # Top Partner & Partner Concentration
     partner_vol = df.groupby("Partner")["Tons"].sum().reset_index().sort_values("Tons", ascending=False)
     if not partner_vol.empty:
         top_partner = partner_vol.iloc[0]["Partner"]
         top_partner_volume = partner_vol.iloc[0]["Tons"]
         top_partner_share = (top_partner_volume / total_volume * 100) if total_volume > 0 else 0
-        # For concentration, sum top 3.
         top_3_volume = partner_vol.head(3)["Tons"].sum()
         concentration_ratio = (top_3_volume / total_volume * 100) if total_volume > 0 else 0
     else:
@@ -117,10 +115,7 @@ def market_overview_dashboard(data: pd.DataFrame):
             template="plotly_white"
         )
         st.plotly_chart(fig_donut, use_container_width=True)
-        if "Period_dt" in df.columns:
-            last_updated = df["Period_dt"].max().strftime("%b-%Y")
-            st.info(f"Data last updated: {last_updated}")
-
+    
     ## Tab 2: Trends
     with tabs[1]:
         st.header("Trends Analysis")
@@ -198,7 +193,7 @@ def market_overview_dashboard(data: pd.DataFrame):
     ## Tab 4: Detailed Analysis
     with tabs[3]:
         st.header("Detailed Analysis")
-        st.markdown("Drill down into a specific partner or reporter for granular insights.")
+        st.markdown("Drill down into the data for granular insights.")
         dimension = st.radio("Select Dimension for Detailed Analysis:", ("Partner", "Reporter"), index=0)
         entities = sorted(df[dimension].dropna().unique().tolist())
         selected_entity = st.selectbox(f"Select {dimension}:", entities)
