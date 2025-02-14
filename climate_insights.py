@@ -3,15 +3,16 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
 from prophet import Prophet
+from datetime import datetime
 
-# -------------------------------------------------------------------
-# Helper: Simulate monthly climate data for a selected region.
-# (Replace this simulation with real climate data when available.)
-# -------------------------------------------------------------------
+# =============================================================================
+# Helper: Simulate monthly climate data for a selected region
+# (Replace this simulation with real climate data when available)
+# =============================================================================
 def simulate_climate_data(region: str) -> pd.DataFrame:
-    # Example simulation parameters for Saudi Arabia regions (adjust as needed)
+    # For demonstration, we simulate data for Saudi Arabia’s key date‐growing regions.
+    # You can adjust these base values according to expert data.
     region_params = {
         "Al-Qassim": {"rainfall_base": 16.5, "temp_base": 38.5},
         "Al-Madinah": {"rainfall_base": 12.0, "temp_base": 38.6},
@@ -23,12 +24,12 @@ def simulate_climate_data(region: str) -> pd.DataFrame:
         return pd.DataFrame()
     params = region_params[region]
     start_date = datetime(2012, 1, 1)
-    # Use current month as the end date (replace with a fixed end date if desired)
+    # For a complete review, we simulate data until the current month.
     end_date = datetime.today().replace(day=1)
     periods = pd.date_range(start_date, end_date, freq="MS")
     n = len(periods)
     np.random.seed(42)
-    # Simulate rainfall (mm) and temperature (°C) with slight random variation.
+    # Simulate rainfall (mm) and temperature (°C) with some variability.
     rainfall = np.clip(np.random.normal(loc=params["rainfall_base"], scale=2, size=n), 0, None)
     temperature = np.random.normal(loc=params["temp_base"], scale=1.5, size=n)
     df = pd.DataFrame({
@@ -39,29 +40,30 @@ def simulate_climate_data(region: str) -> pd.DataFrame:
     df["Period_str"] = df["Period"].dt.strftime("%b-%Y")
     return df
 
-# -------------------------------------------------------------------
+# =============================================================================
 # Helper: Compute crop outcome based on rainfall and temperature.
-# -------------------------------------------------------------------
+# =============================================================================
 def compute_crop_outcome(row, ideal_rain_min, ideal_rain_max, ideal_temp_min, ideal_temp_max) -> str:
     rain = row["Rainfall"]
     temp = row["Temperature"]
-    # Compute relative deviation from ideal rainfall.
+    # Compute deviation scores for rainfall and temperature.
     if ideal_rain_min <= rain <= ideal_rain_max:
         rain_score = 0
     elif rain < ideal_rain_min:
         rain_score = (ideal_rain_min - rain) / ideal_rain_min
     else:
         rain_score = (rain - ideal_rain_max) / ideal_rain_max
-    # Compute relative deviation from ideal temperature.
+
     if ideal_temp_min <= temp <= ideal_temp_max:
         temp_score = 0
     elif temp < ideal_temp_min:
         temp_score = (ideal_temp_min - temp) / ideal_temp_min
     else:
         temp_score = (temp - ideal_temp_max) / ideal_temp_max
-    # Combine the scores equally.
+
+    # Combine scores equally.
     score = (rain_score + temp_score) / 2
-    # Map score to outcome categories.
+    # Map the combined score to an outcome.
     if score <= 0.1:
         return "Excellent"
     elif score <= 0.25:
@@ -71,9 +73,9 @@ def compute_crop_outcome(row, ideal_rain_min, ideal_rain_max, ideal_temp_min, id
     else:
         return "Poor"
 
-# -------------------------------------------------------------------
+# =============================================================================
 # Helper: Forecast future climate metric using Prophet.
-# -------------------------------------------------------------------
+# =============================================================================
 def forecast_climate(df: pd.DataFrame, metric: str, periods: int = 12) -> pd.DataFrame:
     forecast_df = df[["Period", metric]].rename(columns={"Period": "ds", metric: "y"})
     model = Prophet()
@@ -82,18 +84,22 @@ def forecast_climate(df: pd.DataFrame, metric: str, periods: int = 12) -> pd.Dat
     forecast = model.predict(future)
     return forecast
 
-# -------------------------------------------------------------------
+# =============================================================================
 # Main Dashboard Function: Yearly Crop Review & Climate Insights
-# -------------------------------------------------------------------
+# =============================================================================
 def yearly_crop_review_dashboard(data: pd.DataFrame):
-    st.title("🌦 Saudi Arabia Date Crop Climate Insights")
+    st.title("🌦 Date Crop Climate Insights for Saudi Arabia")
     st.markdown("""
-    This dashboard provides a detailed review of climate conditions in Saudi Arabia’s key date‑growing regions.  
-    It simulates monthly climate data (rainfall and temperature) and evaluates the expected date crop outcome based on user‑defined ideal conditions.  
-    Use the sidebar to adjust the ideal ranges and forecast future climate metrics.
+    This dashboard evaluates the climate conditions affecting date crop quality in key regions of Saudi Arabia.
+    The ideal climate for date cultivation typically includes:
+    
+    - **Rainfall:** Moderate (e.g., 14–20 mm/month)
+    - **Temperature:** Warm (e.g., 35–40°C)
+    
+    Adjust the ideal conditions in the sidebar to see how historical climate compares—and forecast future trends.
     """)
 
-    # Let user select a region (for now, our simulation covers four regions).
+    # Let the user select a region.
     regions = ["Al-Qassim", "Al-Madinah", "Riyadh", "Eastern Province"]
     selected_region = st.selectbox("Select Region:", regions)
 
@@ -103,23 +109,21 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         st.error("No climate data available.")
         return
 
-    # Sidebar: Adjust ideal conditions for optimal date crop.
-    st.sidebar.header("Adjust Ideal Conditions")
-    ideal_rain_min = st.sidebar.number_input("Ideal Rainfall Minimum (mm)", value=15.0, step=0.5)
-    ideal_rain_max = st.sidebar.number_input("Ideal Rainfall Maximum (mm)", value=25.0, step=0.5)
+    # Sidebar: Allow adjustments to ideal conditions.
+    st.sidebar.header("Ideal Conditions for Dates")
+    ideal_rain_min = st.sidebar.number_input("Ideal Rainfall Minimum (mm)", value=14.0, step=0.5)
+    ideal_rain_max = st.sidebar.number_input("Ideal Rainfall Maximum (mm)", value=20.0, step=0.5)
     ideal_temp_min = st.sidebar.number_input("Ideal Temperature Minimum (°C)", value=35.0, step=0.5)
     ideal_temp_max = st.sidebar.number_input("Ideal Temperature Maximum (°C)", value=40.0, step=0.5)
 
-    # Compute Crop Outcome based on adjusted ideal conditions.
+    # Compute crop outcome for each month.
     climate_df["Crop Outcome"] = climate_df.apply(
         lambda row: compute_crop_outcome(row, ideal_rain_min, ideal_rain_max, ideal_temp_min, ideal_temp_max),
         axis=1
     )
-
-    # Add Year column.
     climate_df["Year"] = climate_df["Period"].dt.year
 
-    # Compute yearly summary: average rainfall, temperature, and dominant crop outcome.
+    # Compute yearly summary.
     yearly_summary = climate_df.groupby("Year").agg({
         "Rainfall": "mean",
         "Temperature": "mean",
@@ -131,14 +135,14 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         "Crop Outcome": "Dominant Outcome"
     }, inplace=True)
 
-    # Set up multi-tab layout.
+    # Multi-tab layout.
     tabs = st.tabs(["Overview", "Monthly Trends", "Yearly Review", "Forecast", "Download Data"])
 
-    #########################################################
+    # ---------------------------------------------------------------------
     # Tab 1: Overview – Automated Insights and Data Table
-    #########################################################
+    # ---------------------------------------------------------------------
     with tabs[0]:
-        st.header(f"Overview for {selected_region}")
+        st.header(f"Overview: {selected_region}")
         st.markdown("#### Automated Yearly Insights")
         insights = []
         for year in sorted(yearly_summary["Year"].unique()):
@@ -148,32 +152,23 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         st.markdown("#### Detailed Monthly Climate Data")
         st.dataframe(climate_df[["Period_str", "Rainfall", "Temperature", "Crop Outcome"]])
 
-    #########################################################
+    # ---------------------------------------------------------------------
     # Tab 2: Monthly Trends – Interactive Line Charts
-    #########################################################
+    # ---------------------------------------------------------------------
     with tabs[1]:
         st.header("Monthly Climate Trends")
-        # Rainfall Trend Chart
+        # Rainfall Trend
         fig_rain = px.line(climate_df, x="Period_str", y="Rainfall",
                            title="Monthly Rainfall Trend (mm)", markers=True, template="plotly_white")
-        # Annotate months with 'Poor' crop outcome.
-        poor_months = climate_df[climate_df["Crop Outcome"]=="Poor"]
-        for _, row in poor_months.iterrows():
-            fig_rain.add_annotation(x=row["Period_str"], y=row["Rainfall"],
-                                    text="Poor", showarrow=True, arrowhead=1, ax=0, ay=-30)
-        st.plotly_chart(fig_rain, use_container_width=True)
-
-        # Temperature Trend Chart
+        # Temperature Trend
         fig_temp = px.line(climate_df, x="Period_str", y="Temperature",
                            title="Monthly Temperature Trend (°C)", markers=True, template="plotly_white")
-        for _, row in poor_months.iterrows():
-            fig_temp.add_annotation(x=row["Period_str"], y=row["Temperature"],
-                                    text="Poor", showarrow=True, arrowhead=1, ax=0, ay=-30)
+        st.plotly_chart(fig_rain, use_container_width=True)
         st.plotly_chart(fig_temp, use_container_width=True)
 
-    #########################################################
-    # Tab 3: Yearly Review – Stacked Bar Chart and Summary
-    #########################################################
+    # ---------------------------------------------------------------------
+    # Tab 3: Yearly Review – Yearly Distribution of Crop Outcomes
+    # ---------------------------------------------------------------------
     with tabs[2]:
         st.header("Yearly Crop Outcome Review")
         outcome_year = climate_df.groupby(["Year", "Crop Outcome"]).size().reset_index(name="Count")
@@ -183,9 +178,9 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         st.markdown("#### Yearly Climate Summary")
         st.dataframe(yearly_summary)
 
-    #########################################################
+    # ---------------------------------------------------------------------
     # Tab 4: Forecast – Future Climate Prediction Using Prophet
-    #########################################################
+    # ---------------------------------------------------------------------
     with tabs[3]:
         st.header("Climate Forecasting")
         forecast_metric = st.selectbox("Select Metric to Forecast:", ["Rainfall", "Temperature"])
@@ -206,9 +201,9 @@ def yearly_crop_review_dashboard(data: pd.DataFrame):
         )
         st.plotly_chart(fig_forecast, use_container_width=True)
 
-    #########################################################
+    # ---------------------------------------------------------------------
     # Tab 5: Download Data – Export Climate Data as CSV
-    #########################################################
+    # ---------------------------------------------------------------------
     with tabs[4]:
         st.header("Download Climate Data")
         csv_data = climate_df.to_csv(index=False).encode("utf-8")
