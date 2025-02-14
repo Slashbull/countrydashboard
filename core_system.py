@@ -161,12 +161,19 @@ def main():
     authenticate_user()
     logout_button()
     
-    # Navigation using a sidebar radio button
-    selected_page = st.sidebar.radio(
-        "Navigation",
-        ("Home", "Market Overview", "Detailed Analysis", "AI-Based Alerts", "Forecasting", 
-         "Country-Level Insights", "Time Series Decomposition", "Reporting")
-    )
+    # Improved Navigation using a sidebar radio button with clean formatting.
+    nav_options = [
+        "Home", 
+        "Market Overview", 
+        "Detailed Analysis", 
+        "AI-Based Alerts", 
+        "Forecasting", 
+        "Country-Level Insights", 
+        "Time Series Decomposition", 
+        "Reporting"
+    ]
+    selected_page = st.sidebar.radio("Navigation", nav_options)
+    
     st.sidebar.button("Reset Filters", on_click=reset_filters)
     st.session_state["page"] = selected_page
     reset_data()
