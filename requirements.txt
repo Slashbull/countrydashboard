@@ -10,3 +10,4 @@ statsmodels
 scikit-learn
 rapidfuzz
 prophet
+networkx
