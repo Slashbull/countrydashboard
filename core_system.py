@@ -161,13 +161,11 @@ def main():
     authenticate_user()
     logout_button()
     
-    # Improved Navigation using a sidebar radio button with clean formatting.
+    # Navigation options based on your final structure.
     nav_options = [
         "Home", 
         "Market Overview", 
-        "Detailed Analysis", 
-        "AI-Based Alerts", 
-        "Forecasting", 
+        "Alerts_Forcasting", 
         "Country-Level Insights", 
         "Time Series Decomposition", 
         "Reporting"
@@ -196,7 +194,7 @@ def main():
             filtered_df, _ = apply_filters(df)
             if selected_page == "Market Overview":
                 market_overview_dashboard(filtered_df)
-            elif selected_page == "AI-Based Alerts":
+            elif selected_page == "Alerts_Forcasting":
                 alerts_forecasting_dashboard(filtered_df)
             elif selected_page == "Country-Level Insights":
                 country_level_insights_dashboard(filtered_df)
