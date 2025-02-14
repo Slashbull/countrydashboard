@@ -32,13 +32,13 @@ MONTH_ORDER = {
 def country_level_insights_dashboard(data: pd.DataFrame):
     st.title("🌍 Country-Level Insights Dashboard")
     st.markdown("""
-    Explore trade volume aggregated by a chosen dimension.
+    Explore trade volume aggregated by Partner.
     
     Use the tabs below to view an overview, detailed trend analysis, and download the aggregated data.
     """)
 
-    # Allow user to choose the dimension for aggregation.
-    dimension = st.radio("Select Dimension for Aggregation:", ("Reporter", "Partner"), index=0)
+    # Fixed dimension: Partner.
+    dimension = "Partner"
     if dimension not in data.columns:
         st.error(f"🚨 The selected dimension '{dimension}' is missing from the data.")
         return
@@ -46,7 +46,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     # Ensure "Tons" is numeric.
     data["Tons"] = pd.to_numeric(data["Tons"], errors="coerce")
 
-    # Aggregate data by the selected dimension.
+    # Aggregate data by Partner.
     agg_data = data.groupby(dimension, as_index=False)["Tons"].sum()
     agg_data = agg_data.sort_values("Tons", ascending=False)
     total_volume = agg_data["Tons"].sum()
@@ -54,31 +54,19 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     # Apply clustering.
     agg_data = apply_clustering(agg_data)
 
-    # ISO mapping (used for potential future geographic features)
-    if dimension == "Reporter":
-        iso_mapping = {
-            "INDIA": "IND",
-            "USA": "USA",
-            "CHINA": "CHN",
-            "GERMANY": "DEU",
-            "BRAZIL": "BRA",
-            "UNITED KINGDOM": "GBR",
-            "FRANCE": "FRA",
-            "CANADA": "CAN"
-        }
-    else:
-        iso_mapping = {
-            "IRAQ": "IRQ",
-            "UAE": "ARE",
-            "UNITED ARAB EMIRATES": "ARE",
-            "IRAN": "IRN",
-            "SAUDI ARABIA": "SAU",
-            "TUNISIA": "TUN",
-            "ALGERIA": "DZA",
-            "ISRAEL": "ISR",
-            "JORDAN": "JOR",
-            "STATE OF PALESTINE": "PSE"
-        }
+    # ISO mapping (for potential future expansion).
+    iso_mapping = {
+        "IRAQ": "IRQ",
+        "UAE": "ARE",
+        "UNITED ARAB EMIRATES": "ARE",
+        "IRAN": "IRN",
+        "SAUDI ARABIA": "SAU",
+        "TUNISIA": "TUN",
+        "ALGERIA": "DZA",
+        "ISRAEL": "ISR",
+        "JORDAN": "JOR",
+        "STATE OF PALESTINE": "PSE"
+    }
     agg_data["iso_alpha"] = agg_data[dimension].str.upper().map(iso_mapping)
 
     # Create a multi-tab layout.
@@ -88,30 +76,30 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     # Tab 1: Overview – Aggregated Data & Visualizations
     #########################################################
     with tabs[0]:
-        st.header(f"Overview by {dimension}")
+        st.header("Overview by Partner")
         st.markdown("#### Aggregated Data Table")
         st.dataframe(agg_data)
 
-        st.markdown(f"#### Bar Chart: Trade Volume by {dimension}")
+        st.markdown("#### Bar Chart: Trade Volume by Partner")
         fig_bar = px.bar(
             agg_data,
             x=dimension,
             y="Tons",
             color="cluster",
-            title=f"Trade Volume by {dimension} (Clustered)",
+            title="Trade Volume by Partner (Clustered)",
             labels={"Tons": "Volume (Tons)"},
             text_auto=True,
             template="plotly_white"
         )
         st.plotly_chart(fig_bar, use_container_width=True)
 
-        st.markdown(f"#### Donut Chart: Market Share by {dimension}")
+        st.markdown("#### Donut Chart: Market Share by Partner")
         agg_data["Share (%)"] = (agg_data["Tons"] / total_volume) * 100
         fig_donut = px.pie(
             agg_data,
             names=dimension,
             values="Tons",
-            title=f"Market Share by {dimension}",
+            title="Market Share by Partner",
             hole=0.4,
             hover_data={"Share (%)":":.2f"},
             template="plotly_white"
@@ -119,52 +107,79 @@ def country_level_insights_dashboard(data: pd.DataFrame):
         st.plotly_chart(fig_donut, use_container_width=True)
     
     #########################################################
-    # Tab 2: Trend Analysis – Monthly & Yearly Visualization
+    # Tab 2: Trend Analysis – Multiple Trend Visualizations
     #########################################################
     with tabs[1]:
         st.header("Trend Analysis")
         if "Period" not in data.columns or "Year" not in data.columns:
             st.info("Both 'Period' and 'Year' columns are required for detailed trend analysis.")
         else:
+            # --- Overall Trends (aggregated across all data) ---
+            st.subheader("Overall Monthly Trend")
+            overall_monthly = data.groupby("Period")["Tons"].sum().reset_index().sort_values("Period")
+            fig_overall_month = px.line(
+                overall_monthly,
+                x="Period",
+                y="Tons",
+                title="Overall Monthly Trade Volume Trend",
+                markers=True,
+                template="plotly_white"
+            )
+            fig_overall_month.update_layout(xaxis_title="Period", yaxis_title="Volume (Tons)")
+            st.plotly_chart(fig_overall_month, use_container_width=True)
+            
+            st.markdown("---")
+            st.subheader("Overall Yearly Trend")
+            overall_yearly = data.groupby("Year")["Tons"].sum().reset_index().sort_values("Year")
+            fig_overall_year = px.line(
+                overall_yearly,
+                x="Year",
+                y="Tons",
+                title="Overall Yearly Trade Volume Trend",
+                markers=True,
+                template="plotly_white"
+            )
+            fig_overall_year.update_layout(xaxis_title="Year", yaxis_title="Volume (Tons)")
+            st.plotly_chart(fig_overall_year, use_container_width=True)
+
+            st.markdown("---")
+            # --- Detailed Trends for a Selected Partner ---
             # Create a new column "Month_Abbr" from the Period column (assumed format "Jan-2012").
             if "Month_Abbr" not in data.columns:
                 data["Month_Abbr"] = data["Period"].apply(lambda x: x.split("-")[0])
             # Order the Month_Abbr.
             data["Month_Abbr"] = pd.Categorical(data["Month_Abbr"], categories=list(MONTH_ORDER.keys()), ordered=True)
 
-            # Let the user select an entity.
-            selected_entity = st.selectbox(f"Select a {dimension} for Trend Analysis:", agg_data[dimension].unique())
-            entity_data = data[data[dimension] == selected_entity]
+            st.subheader("Monthly Trend (by Year) for Selected Partner")
+            selected_partner = st.selectbox("Select a Partner for Detailed Trend Analysis:", agg_data[dimension].unique())
+            entity_data = data[data[dimension] == selected_partner]
             if entity_data.empty:
-                st.info(f"No trend data available for {selected_entity}.")
+                st.info(f"No trend data available for {selected_partner}.")
             else:
-                st.subheader("Monthly Trend (by Year)")
-                # Multi-line chart: x = Month_Abbr, line color = Year.
                 fig_multiline = px.line(
                     entity_data,
                     x="Month_Abbr",
                     y="Tons",
                     color="Year",
-                    title=f"Monthly Trend for {selected_entity} by Year",
+                    title=f"Monthly Trend for {selected_partner} by Year",
                     markers=True,
                     template="plotly_white"
                 )
                 fig_multiline.update_layout(xaxis_title="Month", yaxis_title="Volume (Tons)")
                 st.plotly_chart(fig_multiline, use_container_width=True)
 
-                st.subheader("Yearly Trend by Month")
-                # Pivot the data: group by Year and Month_Abbr.
+                st.markdown("---")
+                st.subheader("Yearly Trend by Month for Selected Partner")
                 yearly_by_month = entity_data.groupby(["Year", "Month_Abbr"], as_index=False)["Tons"].sum()
                 if yearly_by_month.empty:
                     st.info("No data available for Yearly Trend by Month.")
                 else:
-                    # Multi-line chart: x-axis = Year, with one line per Month.
                     fig_yearly = px.line(
                         yearly_by_month,
                         x="Year",
                         y="Tons",
                         color="Month_Abbr",
-                        title=f"Yearly Trend by Month for {selected_entity}",
+                        title=f"Yearly Trend by Month for {selected_partner}",
                         markers=True,
                         template="plotly_white"
                     )
