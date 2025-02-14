@@ -51,7 +51,7 @@ def country_level_insights_dashboard(data: pd.DataFrame):
     agg_data = agg_data.sort_values("Tons", ascending=False)
     total_volume = agg_data["Tons"].sum()
 
-    # Apply clustering (for additional insights).
+    # Apply clustering.
     agg_data = apply_clustering(agg_data)
 
     # --- ISO Mapping for Geographic Distribution ---
@@ -127,20 +127,20 @@ def country_level_insights_dashboard(data: pd.DataFrame):
         if "Period" not in data.columns or "Year" not in data.columns:
             st.info("Both 'Period' and 'Year' columns are required for detailed trend analysis.")
         else:
-            # Create a new column "Month_Abbr" from the Period column (assumed format "Jan-2012").
+            # Ensure Month abbreviation is extracted.
             if "Month_Abbr" not in data.columns:
                 data["Month_Abbr"] = data["Period"].apply(lambda x: x.split("-")[0])
-            # Ensure month ordering.
+            # Order the Month_Abbr.
             data["Month_Abbr"] = pd.Categorical(data["Month_Abbr"], categories=list(MONTH_ORDER.keys()), ordered=True)
 
-            # Let the user select an entity.
+            # Let the user select an entity for trend analysis.
             selected_entity = st.selectbox(f"Select a {dimension} for Trend Analysis:", agg_data[dimension].unique())
             entity_data = data[data[dimension] == selected_entity]
             if entity_data.empty:
                 st.info(f"No trend data available for {selected_entity}.")
             else:
                 st.subheader("Monthly Trend (by Year)")
-                # Create a multi-line chart: x = Month_Abbr, color = Year.
+                # Multi-line chart with x-axis = Month_Abbr and line color = Year.
                 fig_multiline = px.line(
                     entity_data,
                     x="Month_Abbr",
@@ -153,17 +153,19 @@ def country_level_insights_dashboard(data: pd.DataFrame):
                 fig_multiline.update_layout(xaxis_title="Month", yaxis_title="Volume (Tons)")
                 st.plotly_chart(fig_multiline, use_container_width=True)
 
-                st.subheader("Yearly Trend")
-                yearly_trend = entity_data.groupby("Year", as_index=False)["Tons"].sum()
-                if yearly_trend.empty:
-                    st.info(f"No yearly trend data available for {selected_entity}.")
+                st.subheader("Yearly Trend by Month")
+                # Here, pivot the data: x-axis = Year, and create a line for each month.
+                yearly_by_month = entity_data.groupby(["Year", "Month_Abbr"], as_index=False)["Tons"].sum()
+                if yearly_by_month.empty:
+                    st.info("No data available for Yearly Trend by Month.")
                 else:
-                    fig_yearly = px.bar(
-                        yearly_trend,
+                    fig_yearly = px.line(
+                        yearly_by_month,
                         x="Year",
                         y="Tons",
-                        title=f"Yearly Trade Volume for {selected_entity}",
-                        text_auto=True,
+                        color="Month_Abbr",
+                        title=f"Yearly Trend by Month for {selected_entity}",
+                        markers=True,
                         template="plotly_white"
                     )
                     fig_yearly.update_layout(xaxis_title="Year", yaxis_title="Volume (Tons)")
