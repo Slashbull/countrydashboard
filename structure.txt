@@ -3,10 +3,8 @@ TradeDataDashboard/
 ├── core_system.py               # Main app entry point: user authentication, data loading, routing, etc.
 ├── filters.py                   # Global filters for data (e.g., Year, Month, Partner)
 ├── market_overview.py           # Dashboard module for an overview of market metrics and trends
-├── detailed_analysis.py         # Module for detailed drill-down analytics with multiple tabs (KPIs, trends, partner breakdown)
-├── ai_based_alerts.py           # Module for advanced AI-based alerts (basic threshold and IsolationForest anomaly detection)
-├── forecasting.py               # Module for time series forecasting of trade volume
+├── Alerts_Forcasting.py         # Combined module for AI-based alerts and forecasting
 ├── country_level_insights.py    # Module for aggregated country-level insights and visualizations
-├── time_series_decomposition.py # Module for decomposing time series data into trend, seasonal, and residual components
+├── time_series_decomposition.py # Module for decomposing time series data (trend, seasonal, residual)
 ├── reporting.py                 # Module for exporting and reporting data (CSV downloads, summaries)
 └── requirements.txt             # List of required Python packages and their versions
