@@ -1,181 +1,205 @@
+# climate_insights.py
 import streamlit as st
 import pandas as pd
 import requests
-from io import StringIO
-from datetime import datetime, date
 import plotly.express as px
-import plotly.graph_objects as go
-from sklearn.ensemble import IsolationForest
-from prophet import Prophet
+from datetime import datetime
+from config import WEATHER_API_KEY
 
-# =============================================================================
-# Crop Season Mapping for Date Cultivation (Harvest Period)
-# =============================================================================
-# Harvest season dates are in MM-DD format.
-CROP_SEASON = {
-    "Iraq": {"start": "08-01", "end": "10-31"},
-    "United Arab Emirates": {"start": "07-01", "end": "09-30"},
-    "Iran": {"start": "08-01", "end": "10-31"},
-    "Saudi Arabia": {"start": "07-01", "end": "10-31"},
-    "Tunisia": {"start": "09-01", "end": "11-30"},
-    "Algeria": {"start": "09-01", "end": "11-30"},
-    "Israel": {"start": "08-01", "end": "10-31"},
-    "Jordan": {"start": "08-01", "end": "10-31"},
-    "State of Palestine": {"start": "08-01", "end": "10-31"}
-}
-
-# =============================================================================
-# Region Coordinates for key sub‑regions (approximate)
-# =============================================================================
-REGION_COORDINATES = {
-    "Iraq": {"Al-Qassim": (24.467, 39.617)},  # example for Saudi Arabia from core_system.py
-    "United Arab Emirates": {"Al Ain": (24.2075, 55.7447)},
-    "Iran": {"Khuzestan": (32.0, 48.0)},
-    "Saudi Arabia": {"Al-Madinah": (24.467, 39.617)},
-    "Tunisia": {"Kebili": (33.7037, 8.9708)},
-    "Algeria": {"Biskra": (34.85, 5.73)},
-    "Israel": {"Jordan Valley": (32.5, 35.5)},
-    "Jordan": {"Jordan Valley": (31.5, 35.5)},
-    "State of Palestine": {"Jericho": (31.87, 35.45)}
-}
-
-# =============================================================================
-# Weather Data Fetching Function
-# =============================================================================
-def fetch_crop_season_weather(lat, lon, year, season_start, season_end):
+# -------------------------
+# API FETCH FUNCTIONS
+# -------------------------
+def fetch_open_meteo_data(latitude, longitude, start_date, end_date):
     """
-    Fetch daily historical weather data (max temperature and precipitation sum)
-    for a given latitude, longitude and a crop season (start_date to end_date) in a given year.
-    Uses the Open-Meteo Archive API.
-    If the year is in the future, returns an empty DataFrame.
+    Fetch historical weather data from the free Open-Meteo Archive API.
+    Returns JSON data containing daily max temperature and precipitation.
     """
-    current_year = date.today().year
-    if int(year) > current_year:
-        st.warning(f"Year {year} is in the future. Skipping.")
-        return pd.DataFrame()
+    base_url = "https://archive-api.open-meteo.com/v1/archive"
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "start_date": start_date,
+        "end_date": end_date,
+        "daily": "temperature_2m_max,precipitation_sum",
+        "timezone": "auto"
+    }
+    response = requests.get(base_url, params=params)
+    response.raise_for_status()
+    return response.json()
 
-    # Build start_date and end_date strings in YYYY-MM-DD format.
-    start_date_str = f"{year}-{season_start}"
-    end_date_str   = f"{year}-{season_end}"
-    
-    url = (
-        "https://archive-api.open-meteo.com/v1/archive"
-        f"?latitude={lat}&longitude={lon}"
-        f"&start_date={start_date_str}&end_date={end_date_str}"
-        "&daily=temperature_2m_max,precipitation_sum"
-        "&timezone=auto"
-    )
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        json_data = response.json()
-        daily = pd.DataFrame(json_data["daily"])
-        daily["time"] = pd.to_datetime(daily["time"])
-        return daily
-    except Exception as e:
-        st.error(f"Error fetching weather data for {year}: {e}")
-        return pd.DataFrame()
+def fetch_openweather_data(latitude, longitude, date_str):
+    """
+    Fetch weather data from OpenWeather's historical (timemachine) API.
+    Note: OpenWeather’s historical API only allows one day per call.
+    This function fetches data for the given date.
+    """
+    # Convert date to Unix timestamp.
+    dt = int(datetime.strptime(date_str, "%Y-%m-%d").timestamp())
+    base_url = "http://api.openweathermap.org/data/2.5/onecall/timemachine"
+    params = {
+        "lat": latitude,
+        "lon": longitude,
+        "dt": dt,
+        "appid": WEATHER_API_KEY,
+        "units": "metric"
+    }
+    response = requests.get(base_url, params=params)
+    response.raise_for_status()
+    return response.json()
 
-# =============================================================================
-# Crop Outcome Classification Logic
-# =============================================================================
+# -------------------------
+# DATA PROCESSING FUNCTIONS
+# -------------------------
+def analyze_open_meteo_data(data):
+    """
+    Process Open-Meteo JSON data to compute daily averages.
+    Returns a DataFrame with 'time', 'temperature_2m_max', and 'precipitation_sum'.
+    """
+    daily = data.get("daily", {})
+    if not daily:
+        st.error("No daily data returned from the weather API.")
+        return pd.DataFrame()
+    df = pd.DataFrame({
+        "date": pd.to_datetime(daily.get("time", [])),
+        "max_temp": daily.get("temperature_2m_max", []),
+        "rainfall": daily.get("precipitation_sum", [])
+    })
+    df["year"] = df["date"].dt.year
+    return df
+
+def analyze_openweather_data(data):
+    """
+    Process OpenWeather JSON data.
+    OpenWeather returns hourly data. We aggregate to get the max temperature and total rainfall for that day.
+    """
+    hourly = data.get("hourly", [])
+    if not hourly:
+        st.error("No hourly data returned from the weather API.")
+        return pd.DataFrame()
+    df = pd.DataFrame(hourly)
+    df["date"] = pd.to_datetime(df["dt"], unit="s")
+    # Get max temperature and sum of rainfall (if available) for the day.
+    # Rain may be nested under 'rain' (e.g., {"1h": value})
+    df["rainfall"] = df.get("rain", pd.Series([0]*len(df))).apply(lambda x: x.get("1h", 0) if isinstance(x, dict) else 0)
+    summary = df.groupby(df["date"].dt.date).agg({
+        "temp": "max",
+        "rainfall": "sum"
+    }).reset_index().rename(columns={"date": "date", "temp": "max_temp"})
+    summary["date"] = pd.to_datetime(summary["date"])
+    summary["year"] = summary["date"].dt.year
+    return summary
+
 def classify_crop_outcome(avg_rainfall, avg_temp):
     """
-    Classify the date crop outcome based on average monthly rainfall (mm) and 
-    average maximum temperature (°C) during the harvest season.
-    Adjust thresholds based on agronomic research.
+    Given average rainfall (in mm) and average maximum temperature (°C),
+    classify the crop outcome for dates. The thresholds below are hypothetical;
+    you should calibrate them based on agronomic research.
     """
-    if 14 <= avg_rainfall <= 17 and 37 <= avg_temp <= 40:
+    # Optimal conditions for date palms (example values):
+    # Rainfall: ~14-16 mm, Max Temp: ~37-39°C → Excellent
+    if 13 <= avg_rainfall <= 17 and 37 <= avg_temp <= 39:
         return "Excellent"
-    elif 10 <= avg_rainfall < 14 and 36 <= avg_temp <= 40:
+    elif (11 <= avg_rainfall < 13 or 17 < avg_rainfall <= 19) or (36 <= avg_temp < 37 or 39 < avg_temp <= 40):
         return "Good"
-    elif 8 <= avg_rainfall < 10 or (35 <= avg_temp < 36 or 40 < avg_temp <= 42):
+    elif (9 <= avg_rainfall < 11 or 19 < avg_rainfall <= 21) or (35 <= avg_temp < 36 or 40 < avg_temp <= 41):
         return "Moderate"
     else:
         return "Poor"
 
-# =============================================================================
-# Main Dashboard Function for Yearly Crop Review
-# =============================================================================
-def yearly_crop_review_dashboard(_):
-    st.title("🌦️ Yearly Crop Review for Date Cultivation")
+# -------------------------
+# DASHBOARD FUNCTION
+# -------------------------
+def yearly_crop_review_dashboard(data: pd.DataFrame):
+    st.title("🌦 Climate & Date Crop Outcome Insights")
     st.markdown("""
-    **Overview:** This dashboard analyzes historical weather conditions during the harvest season for date cultivation.
-    
-    **Steps:**
-    1. Select a country and sub-region.
-    2. Specify a year range.
-    3. For each year (past years only), we fetch the daily maximum temperature and precipitation data during the harvest season.
-    4. We compute the average maximum temperature and average monthly rainfall.
-    5. Based on these metrics, the crop outcome is classified.
+    This module fetches historical weather data for a selected country/region, aggregates it by year,
+    and predicts the dominant crop outcome (for dates) based on average rainfall and maximum temperature.
     """)
     
-    # Sidebar selections: Country, Sub-region, Year Range
-    country = st.selectbox("Select Country:", list(CROP_SEASON.keys()))
-    subregion = st.selectbox("Select Sub-region:", list(REGION_COORDINATES[country].keys()))
-    lat, lon = REGION_COORDINATES[country][subregion]
+    # Let user select the country (representative region for date cultivation)
+    countries = ["Iraq", "United Arab Emirates", "Iran", "Saudi Arabia", "Tunisia", "Algeria", "Israel", "Jordan", "State of Palestine"]
+    selected_country = st.selectbox("Select Country:", countries)
     
-    # Get crop season dates for the selected country.
-    season = CROP_SEASON[country]
-    st.info(f"For {country}, the harvest season is set from {season['start']} to {season['end']} (MM-DD).")
+    # Representative coordinates for date growing regions:
+    coordinates = {
+        "Iraq": (30.5085, 47.7836),  # Basra region
+        "United Arab Emirates": (24.2075, 55.7447),  # Al Ain region
+        "Iran": (29.5918, 52.5836),  # Khuzestan region
+        "Saudi Arabia": (26.33, 43.97),  # Al-Qassim region (approx)
+        "Tunisia": (33.9190, 8.1303),  # Tozeur region
+        "Algeria": (34.8554, 5.7280),  # Biskra region
+        "Israel": (31.0461, 34.8516),  # Jordan Valley area (approx)
+        "Jordan": (31.9454, 35.9284),  # Jordan Valley
+        "State of Palestine": (31.9468, 35.3027)  # Jericho area
+    }
+    lat, lon = coordinates[selected_country]
     
-    start_year = st.number_input("Start Year:", min_value=2012, max_value=date.today().year, value=2012, step=1)
-    end_year   = st.number_input("End Year:", min_value=int(start_year), max_value=date.today().year, value=date.today().year, step=1)
-    years = list(range(int(start_year), int(end_year) + 1))
+    # Let user choose which weather API to use.
+    api_method = st.radio("Select Weather API:", ["Open-Meteo (Free)", "OpenWeather (Using API Key)"])
     
-    st.info(f"Fetching harvest season weather data for {subregion}, {country} from {start_year} to {end_year}...")
-    
-    records = []
-    for yr in years:
-        daily_df = fetch_crop_season_weather(lat, lon, yr, season['start'], season['end'])
-        if daily_df.empty:
-            continue
-        avg_temp = daily_df["temperature_2m_max"].mean()
-        total_precip = daily_df["precipitation_sum"].sum()
-        start_month = int(season['start'].split("-")[0])
-        end_month = int(season['end'].split("-")[0])
-        n_months = end_month - start_month + 1
-        avg_rainfall = total_precip / n_months if n_months > 0 else 0
-        outcome = classify_crop_outcome(avg_rainfall, avg_temp)
-        records.append({
-            "Year": yr,
-            "Avg Rainfall (mm)": round(avg_rainfall, 2),
-            "Avg Max Temp (°C)": round(avg_temp, 2),
-            "Dominant Outcome": outcome
-        })
-    
-    if not records:
-        st.error("No weather data available for the selected period and region.")
+    # Let user specify the year range for analysis.
+    current_year = datetime.now().year
+    start_year = st.number_input("Start Year:", min_value=2012, max_value=current_year, value=2012, step=1)
+    end_year = st.number_input("End Year:", min_value=2012, max_value=current_year, value=current_year, step=1)
+    if start_year > end_year:
+        st.error("Start Year must be less than or equal to End Year.")
         return
     
-    result_df = pd.DataFrame(records)
-    st.markdown("### Automated Yearly Insights")
-    st.dataframe(result_df)
+    start_date = f"{start_year}-01-01"
+    end_date = f"{end_year}-12-31"
     
-    # Visualizations: Line Charts
-    fig_rain = px.line(result_df, x="Year", y="Avg Rainfall (mm)", markers=True, 
-                         title="Average Monthly Rainfall During Harvest Season", 
-                         template="plotly_white")
-    fig_temp = px.line(result_df, x="Year", y="Avg Max Temp (°C)", markers=True, 
-                         title="Average Maximum Temperature During Harvest Season", 
-                         template="plotly_white")
+    st.info(f"Fetching weather data for {selected_country} from {start_date} to {end_date} using {api_method}...")
     
-    # Annotated bar chart for outcomes.
-    fig_outcome = px.bar(result_df, x="Year", y="Avg Rainfall (mm)", 
-                         title="Yearly Average Rainfall & Crop Outcome", 
-                         text="Dominant Outcome", 
-                         template="plotly_white")
+    # Fetch data from the chosen API
+    weather_json = None
+    try:
+        if api_method == "Open-Meteo (Free)":
+            weather_json = fetch_open_meteo_data(lat, lon, start_date, end_date)
+            df_weather = analyze_open_meteo_data(weather_json)
+        else:
+            # For OpenWeather, we'll demonstrate with a single day's data per year.
+            # In production, you might loop over each year and average the values.
+            years = list(range(start_year, end_year + 1))
+            records = []
+            for yr in years:
+                sample_date = f"{yr}-06-15"  # choose mid-year as representative
+                try:
+                    json_data = fetch_openweather_data(lat, lon, sample_date)
+                    df_day = analyze_openweather_data(json_data)
+                    if not df_day.empty:
+                        # Average the day's values (only one day, so it's the value)
+                        records.append({"year": yr,
+                                        "rainfall": df_day["rainfall"].mean(),
+                                        "max_temp": df_day["max_temp"].mean()})
+                except Exception as e:
+                    st.error(f"Error fetching OpenWeather data for {yr}: {e}")
+            df_weather = pd.DataFrame(records)
+    except Exception as e:
+        st.error(f"Error fetching weather data: {e}")
+        return
     
-    st.plotly_chart(fig_rain, use_container_width=True)
+    if df_weather.empty:
+        st.error("No weather data available.")
+        return
+    
+    # Compute crop outcome per year
+    df_weather["Crop Outcome"] = df_weather.apply(lambda row: classify_crop_outcome(row["rainfall"], row["max_temp"]), axis=1)
+    
+    # Display the yearly summary
+    st.subheader("Yearly Climate & Crop Outcome Summary")
+    st.dataframe(df_weather)
+    
+    # Plot trends
+    fig_temp = px.line(df_weather, x="year", y="max_temp", title="Yearly Avg Max Temperature (°C)", markers=True)
+    fig_rain = px.line(df_weather, x="year", y="rainfall", title="Yearly Avg Rainfall (mm)", markers=True)
     st.plotly_chart(fig_temp, use_container_width=True)
-    st.plotly_chart(fig_outcome, use_container_width=True)
+    st.plotly_chart(fig_rain, use_container_width=True)
     
-    # Download aggregated data as CSV.
-    csv_data = result_df.to_csv(index=False).encode("utf-8")
-    st.download_button("Download Yearly Crop Review Data as CSV", csv_data, "yearly_crop_review.csv", "text/csv")
+    st.markdown("### Combined Climate & Outcome Insights")
+    for _, row in df_weather.iterrows():
+        st.write(f"{int(row['year'])}: Avg Rainfall = {row['rainfall']:.1f} mm, Avg Max Temp = {row['max_temp']:.1f} °C, Dominant Outcome: {row['Crop Outcome']}")
     
-    st.success("✅ Yearly Crop Review loaded successfully!")
-
-# For standalone testing
+    st.success("✅ Climate Insights Dashboard loaded successfully!")
+    
 if __name__ == "__main__":
-    yearly_crop_review_dashboard(None)
+    yearly_crop_review_dashboard(None)  # For testing standalone; remove or integrate in core_system.py in production.
