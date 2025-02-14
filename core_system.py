@@ -20,7 +20,7 @@ from segmentation_analysis import segmentation_analysis_dashboard
 from correlation_analysis import correlation_analysis_dashboard
 from time_series_decomposition import time_series_decomposition_dashboard
 from calendar_insights import calendar_insights_dashboard
-from climate_insights import climate_insights_dashboard
+from climate_insights import date_crop_analysis_dashboard
 from scenario_simulation import scenario_simulation_dashboard
 from reporting import reporting_dashboard
 
