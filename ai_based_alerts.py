@@ -30,12 +30,15 @@ def ai_based_alerts_dashboard(data: pd.DataFrame):
     pct_change = grouped.pct_change(axis=1) * 100
     pct_change = pct_change.round(2)
     
-    # Latest period label
+    # Get the label for the latest period
     latest_period = pct_change.columns[-1]
+    st.info(f"Calculations are based on the latest period: {latest_period}")
 
     # Let user choose the alert method.
-    alert_method = st.radio("Select Alert Method:", ["Basic Threshold", "Advanced Anomaly Detection", "Comparison"])
+    alert_method = st.radio("Select Alert Method:", 
+                            ["Basic Threshold", "Advanced Anomaly Detection", "Comparison"])
 
+    # ----- Basic Threshold Mode -----
     if alert_method == "Basic Threshold":
         st.subheader("Basic Threshold Alerts")
         threshold = st.slider("Alert Threshold (% Change)", min_value=0, max_value=100, value=20, step=5)
@@ -46,6 +49,8 @@ def ai_based_alerts_dashboard(data: pd.DataFrame):
             st.success("✅ No partners exceed the specified threshold.")
         else:
             st.dataframe(basic_alerts)
+            # Download button for alerts table.
+            st.download_button("Download Alerts as CSV", basic_alerts.to_csv(index=False).encode("utf-8"), "basic_alerts.csv", "text/csv")
             fig_basic = px.bar(
                 basic_alerts,
                 x="Partner",
@@ -58,6 +63,7 @@ def ai_based_alerts_dashboard(data: pd.DataFrame):
             )
             st.plotly_chart(fig_basic, use_container_width=True)
 
+    # ----- Advanced Anomaly Detection Mode -----
     elif alert_method == "Advanced Anomaly Detection":
         st.subheader("Advanced Anomaly Detection Alerts")
         st.markdown("Using IsolationForest to detect anomalies in the latest period's percentage changes.")
@@ -67,7 +73,6 @@ def ai_based_alerts_dashboard(data: pd.DataFrame):
         latest_pct = pct_change[latest_period].fillna(0).values.reshape(-1, 1)
         model = IsolationForest(contamination=contamination, random_state=42)
         preds = model.fit_predict(latest_pct)
-        # Anomalies where prediction == -1.
         anomalies = pct_change[latest_period][preds == -1]
         anomalies_df = anomalies.reset_index().rename(columns={latest_period: "Latest % Change"})
         anomalies_df.columns = ["Partner", "Latest % Change"]
@@ -76,6 +81,7 @@ def ai_based_alerts_dashboard(data: pd.DataFrame):
             st.success("✅ No anomalies detected.")
         else:
             st.dataframe(anomalies_df)
+            st.download_button("Download Anomaly Alerts as CSV", anomalies_df.to_csv(index=False).encode("utf-8"), "advanced_alerts.csv", "text/csv")
             fig_advanced = px.bar(
                 anomalies_df,
                 x="Partner",
@@ -88,17 +94,18 @@ def ai_based_alerts_dashboard(data: pd.DataFrame):
             )
             st.plotly_chart(fig_advanced, use_container_width=True)
 
+    # ----- Comparison Mode -----
     elif alert_method == "Comparison":
         st.subheader("Comparison of Basic and Advanced Methods")
         # Basic method parameters.
-        threshold = st.slider("Alert Threshold (% Change) for Basic Method", min_value=0, max_value=100, value=20, step=5, key="comp_threshold")
-        basic_alerts = pct_change[pct_change[latest_period].abs() >= threshold][[latest_period]].reset_index()
+        basic_threshold = st.slider("Basic Method Alert Threshold (% Change)", min_value=0, max_value=100, value=20, step=5, key="comp_threshold")
+        basic_alerts = pct_change[pct_change[latest_period].abs() >= basic_threshold][[latest_period]].reset_index()
         basic_alerts.columns = ["Partner", "Latest % Change"]
 
         # Advanced method parameters.
-        contamination = st.slider("IsolationForest Contamination (Advanced Method)", min_value=0.01, max_value=0.5, value=0.1, step=0.01, key="comp_contam")
+        adv_contamination = st.slider("Advanced Method Contamination", min_value=0.01, max_value=0.5, value=0.1, step=0.01, key="comp_contam")
         latest_pct = pct_change[latest_period].fillna(0).values.reshape(-1, 1)
-        model = IsolationForest(contamination=contamination, random_state=42)
+        model = IsolationForest(contamination=adv_contamination, random_state=42)
         preds = model.fit_predict(latest_pct)
         advanced_alerts = pct_change[latest_period][preds == -1].reset_index().rename(columns={latest_period: "Latest % Change"})
         advanced_alerts.columns = ["Partner", "Latest % Change"]
@@ -110,12 +117,14 @@ def ai_based_alerts_dashboard(data: pd.DataFrame):
                 st.success("✅ No basic alerts.")
             else:
                 st.dataframe(basic_alerts)
+                st.download_button("Download Basic Alerts as CSV", basic_alerts.to_csv(index=False).encode("utf-8"), "basic_alerts.csv", "text/csv")
         with col2:
             st.markdown("**Advanced Anomaly Alerts:**")
             if advanced_alerts.empty:
                 st.success("✅ No advanced anomalies detected.")
             else:
                 st.dataframe(advanced_alerts)
+                st.download_button("Download Advanced Alerts as CSV", advanced_alerts.to_csv(index=False).encode("utf-8"), "advanced_alerts.csv", "text/csv")
         
         st.markdown("---")
         st.markdown("**Combined Bar Chart Comparison:**")
