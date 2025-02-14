@@ -6,6 +6,9 @@ from io import StringIO
 import logging
 from datetime import datetime
 
+# Additional library for advanced sidebar navigation
+from streamlit_option_menu import option_menu
+
 # Import configuration and filters
 import config
 from filters import apply_filters
@@ -23,6 +26,25 @@ from calendar_insights import calendar_insights_dashboard
 from climate_insights import climate_insights_dashboard
 from scenario_simulation import scenario_simulation_dashboard
 from reporting import reporting_dashboard
+
+# -----------------------------------------------------------------------------
+# Custom CSS for enhanced UI/UX
+# -----------------------------------------------------------------------------
+custom_css = """
+<style>
+/* Custom sidebar style */
+.css-1d391kg {  /* Change sidebar background color */
+    background-color: #f0f2f6;
+}
+.css-18e3th9 {  /* Header font style */
+    font-family: 'Segoe UI', sans-serif;
+    font-weight: bold;
+    font-size: 1.5rem;
+    color: #333;
+}
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # Logging Configuration
@@ -82,17 +104,12 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     'Period' column from 'Month' and 'Year'. Supports both numeric and abbreviated month values.
     """
     if "Tons" in df.columns:
-        df["Tons"] = pd.to_numeric(
-            df["Tons"].astype(str).str.replace(",", "", regex=False),
-            errors="coerce"
-        )
+        df["Tons"] = pd.to_numeric(df["Tons"].astype(str).str.replace(",", "", regex=False), errors="coerce")
     if "Year" in df.columns and "Month" in df.columns:
         try:
             def parse_period(row):
                 m = row["Month"]
                 y = str(row["Year"])
-                # If Month is numeric, convert to integer and parse as month number;
-                # otherwise assume abbreviated month name.
                 if str(m).isdigit():
                     return datetime.strptime(f"{int(m)} {y}", "%m %Y")
                 else:
@@ -101,7 +118,6 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
             sorted_periods = sorted(df["Period_dt"].dropna().unique())
             period_labels = [dt.strftime("%b-%Y") for dt in sorted_periods]
             df["Period"] = df["Period_dt"].dt.strftime("%b-%Y")
-            # Use a categorical type to enforce proper order on the x-axis in plots.
             df["Period"] = pd.Categorical(df["Period"], categories=period_labels, ordered=True)
             logger.info("Period column created successfully.")
         except Exception as e:
@@ -120,12 +136,10 @@ def upload_data():
         return st.session_state["data"]
 
     df = None
-    # If a permanent Google Sheet link is configured, load data automatically.
     if config.USE_PERMANENT_GOOGLE_SHEET_LINK:
         sheet_url = config.PERMANENT_GOOGLE_SHEET_LINK
         st.info("Loading data from permanent Google Sheet...")
         try:
-            # Extract the sheet ID and build CSV URL.
             sheet_id = sheet_url.split("/d/")[1].split("/")[0]
             csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={config.DEFAULT_SHEET_NAME}"
             response = requests.get(csv_url)
@@ -155,11 +169,9 @@ def upload_data():
                 except Exception as e:
                     st.error(f"🚨 Error loading Google Sheet: {e}")
                     logger.error("Error loading user-provided Google Sheet: %s", e)
-
     if df is not None and not df.empty:
         df = preprocess_data(df)
         st.session_state["data"] = df
-        # Apply global filters via the filters module.
         filtered_df, _ = apply_filters(df)
         st.session_state["filtered_data"] = filtered_df
         st.success("✅ Data loaded and preprocessed successfully!")
@@ -199,30 +211,46 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Authentication & Logout controls.
+    # Authentication & Logout
     authenticate_user()
     logout_button()
     
-    # Sidebar Navigation
-    pages = [
-        "Home",
-        "Market Overview",
-        "Detailed Analysis",
-        "AI-Based Alerts",
-        "Forecasting",
-        "Country-Level Insights",
-        "Segmentation Analysis",
-        "Correlation Analysis",
-        "Time Series Decomposition",
-        "Calendar Insights",
-        "Climate Insights",
-        "Scenario Simulation",
-        "Reporting"
-    ]
-    selected_page = st.sidebar.radio("Navigation", pages, index=0)
+    # Advanced Sidebar Navigation using streamlit-option-menu
+    with st.sidebar:
+        selected_page = option_menu(
+            "Navigation", 
+            options=[
+                "Home",
+                "Market Overview",
+                "Detailed Analysis",
+                "AI-Based Alerts",
+                "Forecasting",
+                "Country-Level Insights",
+                "Segmentation Analysis",
+                "Correlation Analysis",
+                "Time Series Decomposition",
+                "Calendar Insights",
+                "Climate Insights",
+                "Scenario Simulation",
+                "Reporting"
+            ],
+            icons=[
+                "house", "bar-chart-line", "search", "bell", "graph-up", 
+                "geo-alt", "layers", "diagram-3", "clock", "calendar", 
+                "cloud-sun", "kanban", "file-earmark"
+            ],
+            menu_icon="cast",
+            default_index=0,
+            styles={
+                "container": {"padding": "5!important", "background-color": "#f0f2f6"},
+                "icon": {"color": "orange", "font-size": "18px"}, 
+                "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "--hover-color": "#eee"},
+                "nav-link-selected": {"background-color": "#02ab21"},
+            }
+        )
     st.session_state["page"] = selected_page
 
-    # Allow data reset in the sidebar on every page.
+    # Data reset button always available in sidebar.
     reset_data()
 
     if selected_page == "Home":
@@ -240,7 +268,6 @@ def main():
         if df is None or df.empty:
             st.error("No data available. Please upload data on the Home page.")
         else:
-            # Reapply global filters on every page.
             filtered_df, _ = apply_filters(df)
             if selected_page == "Market Overview":
                 market_overview_dashboard(filtered_df)
