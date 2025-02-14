@@ -28,15 +28,25 @@ from scenario_simulation import scenario_simulation_dashboard
 from reporting import reporting_dashboard
 
 # -----------------------------------------------------------------------------
+# Set page configuration as the very first Streamlit command
+# -----------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Trade Data Dashboard", 
+    layout="wide", 
+    initial_sidebar_state="expanded"
+)
+
+# -----------------------------------------------------------------------------
 # Custom CSS for enhanced UI/UX
 # -----------------------------------------------------------------------------
 custom_css = """
 <style>
 /* Custom sidebar style */
-.css-1d391kg {  /* Change sidebar background color */
+.css-1d391kg {  
     background-color: #f0f2f6;
 }
-.css-18e3th9 {  /* Header font style */
+/* Custom header style */
+.css-18e3th9 {
     font-family: 'Segoe UI', sans-serif;
     font-weight: bold;
     font-size: 1.5rem;
@@ -205,12 +215,6 @@ def display_footer():
 # MAIN APPLICATION FUNCTION
 # -----------------------------------------------------------------------------
 def main():
-    st.set_page_config(
-        page_title="Trade Data Dashboard", 
-        layout="wide", 
-        initial_sidebar_state="expanded"
-    )
-    
     # Authentication & Logout
     authenticate_user()
     logout_button()
